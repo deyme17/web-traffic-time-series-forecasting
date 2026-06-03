@@ -1,6 +1,7 @@
 numpy>=1.26
 pandas>=2.1
 scikit-learn>=1.4
+statsmodels>=0.14.6
 
 torch>=2.2 --index-url https://download.pytorch.org/whl/cu126
 torchvision>=0.17 --index-url https://download.pytorch.org/whl/cu126
