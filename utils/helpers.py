@@ -118,7 +118,12 @@ def visualize_training(train_loss: list[float],
 
 
 def normalize(arr: np.ndarray) -> np.ndarray:
-    mu = arr.mean(0)
-    std = arr.std(0)
-    std[std == 0] = 1.
+    mu = arr.mean(axis=0)
+    std = arr.std(axis=0)
+
+    if np.isscalar(std):
+        std = 1. if std == 0 else std
+    else:
+        std[std == 0] = 1.
+
     return ((arr - mu) / std).astype(np.float32)
