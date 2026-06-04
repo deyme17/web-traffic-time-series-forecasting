@@ -17,9 +17,14 @@ class Config:
     data_dir: Path = Path("data").resolve()
     checkpoints_dir: Path = Path("checkpoints").resolve()
 
-    # dataloader
+    # data
+    nan_threshold: float = 0.5
     lookback: int = 90
     horizon: int = 62
+    add_days: int = 63
+    first_date: str = "2015-07-01"
+
+    # dataloader
     batch_size: int = 512
 
     n_workers: int = 4
