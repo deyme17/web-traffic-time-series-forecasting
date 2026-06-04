@@ -2,6 +2,8 @@ from typing import Optional, Tuple, Dict, List, Any
 from pathlib import Path
 import random as rnd
 import numpy as np
+import csv
+import zipfile
 import matplotlib.pyplot as plt
 
 from torch import nn
@@ -10,10 +12,46 @@ import torch
 
 
 
+
 def set_seed(seed: int) -> None:
     rnd.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+
+
+
+def _open_csv(path: Path):
+    if path.suffix == ".zip":
+        zf = zipfile.ZipFile(path)
+        name = next(n for n in zf.namelist() if n.endswith(".csv"))
+        return zf.open(name)
+    return open(path, "rb")
+
+def read_csv(path: Path) -> Tuple[List[str], np.ndarray]:
+    """Row-by-row read. Returns (page_names, float32 [n_pages, n_days], NaN=missing)."""
+    print(f"Reading {path} ...")
+    with _open_csv(path) as fh:
+        reader = csv.reader(l.decode() for l in fh)
+        header = next(reader)
+        n_days = len(header) - 1
+        n_pages = sum(1 for _ in reader)
+
+    pages = []
+    data = np.full((n_pages, n_days), np.nan, dtype=np.float32)
+
+    with _open_csv(path) as fh:
+        reader = csv.reader(l.decode() for l in fh)
+        next(reader)
+        for i, row in enumerate(reader):
+            pages.append(row[0])
+            for j, v in enumerate(row[1:]):
+                if v:
+                    data[i, j] = float(v)
+            if i % 10_000 == 0:
+                print(f"  {i}/{n_pages}", end="\r", flush=True)
+
+    print(f"\n\tshape: {data.shape}")
+    return pages, data
 
 
 
