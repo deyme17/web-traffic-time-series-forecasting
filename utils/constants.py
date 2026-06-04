@@ -3,7 +3,6 @@ import re
 
 # === data processing constants ===
 
-
 LAG_DAYS = [7, 31, 180, 365]
 
 ACCESS = ["spider", "desktop", "mobile-web", "all-access"]
@@ -21,3 +20,19 @@ RE_PAGE = re.compile(
 MAX_GAP_INTERPOLATE = 7     # if gaps <= MAX_GAP_INTERPOLATE -> linear interpolation
 NAN_DROP_THRESHOLD = 0.3    # drop page if fraction of NaNs > NAN_DROP_THRESHOLD
 WINSOR_K = 4.               # spike threshold: median +- WINSOR_K * MAD
+
+
+# === feature size constants ====
+
+N_LAGS = len(LAG_DAYS)
+N_PAGE_CAT = len(ACCESS) + len(AGENTS) + len(LANGS) + len(SITES)
+N_TEMPORAL = 4      # sin_dow, cos_dow, sin_month, cos_month
+N_PAGE_SCALAR = 2   # year_autocorr, quarter_autocorr
+N_PAGE_STAT = 3     # page_mean, page_std, page_vc
+
+
+# === dataset/model constants
+
+N_PAGE = N_PAGE_SCALAR + N_PAGE_STAT + N_PAGE_CAT
+ENC_DIM = 1 + N_LAGS + N_LAGS + N_TEMPORAL + N_PAGE
+DEC_DIM = ENC_DIM - 1
