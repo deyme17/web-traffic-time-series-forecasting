@@ -18,7 +18,7 @@ class Config:
     checkpoints_dir: Path = Path("checkpoints").resolve()
 
     # data
-    nan_threshold: float = 0.5      # drop page if fraction of NaNs > nan_threshold
+    nan_threshold: float = 0.3      # drop page if fraction of NaNs > nan_threshold
     max_gap_interpolate: int = 7    # if gaps <= max_gap_interpolate -> linear interpolation
     winsor_k: float = 4.            # spike threshold: median +- winsor_k * MAD
 
