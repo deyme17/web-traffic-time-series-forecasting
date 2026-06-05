@@ -12,6 +12,9 @@ class SMAPELoss(nn.Module):
                 mask: torch.Tensor|None = None) -> torch.Tensor:
         denom = (pred.abs() + target.abs() + self.eps).clamp(min=0.5 + self.eps)
         loss = (pred - target).abs() / denom * 2.
+
         if mask is not None:
-            loss = loss[mask]
+            loss = loss.masked_fill(~mask, 0.)
+            return loss.sum() / mask.sum().clamp(min=1)
+
         return loss.mean()

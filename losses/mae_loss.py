@@ -10,6 +10,9 @@ class MAELoss(nn.Module):
     def forward(self, pred: torch.Tensor, target: torch.Tensor, 
                 mask: torch.Tensor|None = None) -> torch.Tensor:
         loss = (target - pred).abs()
+
         if mask is not None:
-            loss = loss[mask]
+            loss = loss.masked_fill(~mask, 0.)
+            return loss.sum() / mask.sum().clamp(min=1)
+        
         return loss.mean() 
