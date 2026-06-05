@@ -45,8 +45,9 @@ class Config:
 
     # registries
     model: RegistryConfig = field(default_factory=RegistryConfig)
-    optimizer: RegistryConfig = field(default_factory=RegistryConfig)
     loss: RegistryConfig = field(default_factory=RegistryConfig)
+    optimizer: RegistryConfig = field(default_factory=RegistryConfig)
+    scheduler: RegistryConfig = field(default_factory=RegistryConfig)
 
     def __post_init__(self) -> None:
         """
