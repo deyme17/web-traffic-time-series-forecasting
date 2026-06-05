@@ -1,9 +1,10 @@
 from utils import Registry
-from torch.nn import HuberLoss, L1Loss
+from .mae_loss import MAELoss
 from .smape_loss import SMAPELoss
+from .huber_loss import HuberLoss
 
 LOSSES = Registry()
 
-LOSSES.register("Huber")(HuberLoss)
-LOSSES.register("MAE")(L1Loss)
+LOSSES.register("MAE")(MAELoss)
 LOSSES.register("SMAPE")(SMAPELoss)
+LOSSES.register("Huber")(HuberLoss)
