@@ -22,7 +22,7 @@ class Config:
     max_gap_interpolate: int = 7    # if gaps <= max_gap_interpolate -> linear interpolation
     winsor_k: float = 4.            # spike threshold: median +- winsor_k * MAD
 
-    lookback: int = 90
+    lookback: int = 365
     horizon: int = 62
     add_days: int = 63
     first_date: str = "2015-07-01"

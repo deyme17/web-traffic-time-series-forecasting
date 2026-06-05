@@ -275,7 +275,6 @@ def main() -> None:
 
     # handle missings
     print("Interpolating gaps...")
-    nan_mask = np.isnan(raw)
     raw = interpolate_gaps(raw, config.max_gap_interpolate)
     nan_mask = np.isnan(raw)
 
