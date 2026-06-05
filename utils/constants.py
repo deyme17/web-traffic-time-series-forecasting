@@ -17,10 +17,6 @@ RE_PAGE = re.compile(
     r"(spider|all-agents)$"
 )
 
-MAX_GAP_INTERPOLATE = 7     # if gaps <= MAX_GAP_INTERPOLATE -> linear interpolation
-NAN_DROP_THRESHOLD = 0.3    # drop page if fraction of NaNs > NAN_DROP_THRESHOLD
-WINSOR_K = 4.               # spike threshold: median +- WINSOR_K * MAD
-
 
 # === feature size constants ====
 

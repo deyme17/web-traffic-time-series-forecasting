@@ -11,8 +11,7 @@ from utils import (
     read_csv, normalize, set_seed, Config
 )
 from utils.constants import (
-    LANGS, ACCESS, AGENTS, SITES, RE_PAGE,
-    WINSOR_K, MAX_GAP_INTERPOLATE, LAG_DAYS
+    LANGS, ACCESS, AGENTS, SITES, RE_PAGE, LAG_DAYS
 )
 
 
@@ -59,9 +58,9 @@ def parse_pages(pages: List[str]) -> Dict[str, np.ndarray]:
 # ============================================ CLEANING ============================================
 
 
-def winsorize(data: np.ndarray) -> np.ndarray:
+def winsorize(data: np.ndarray, winsor_k: float) -> np.ndarray:
     """
-    Per-series spike capping: values > median + WINSOR_K * MAD -> capped.
+    Per-series spike capping: values > median + winsor_k * MAD -> capped.
     Operates on raw (pre-log) data in-place copy. NaN ignored.
     """
     out = data.copy()
@@ -74,14 +73,14 @@ def winsorize(data: np.ndarray) -> np.ndarray:
         mad = float(np.median(np.abs(vals - med)))
         if mad == 0:
             continue
-        hi = med + WINSOR_K * mad
+        hi = med + winsor_k * mad
         row[row > hi] = hi
     return out
 
 
-def interpolate_gaps(data: np.ndarray) -> np.ndarray:
+def interpolate_gaps(data: np.ndarray, max_gap_interpolate: int) -> np.ndarray:
     """
-    For each series interpolate missing days if gaps <= MAX_GAP_INTERPOLATE.
+    For each series interpolate missing days if gaps <= max_gap_interpolate.
     Returns cleaned data (NaN filled).
     """
     out = data.copy()
@@ -106,7 +105,7 @@ def interpolate_gaps(data: np.ndarray) -> np.ndarray:
 
         for g in groups:
             left, right = g[0] - 1, g[-1] + 1
-            if len(g) <= MAX_GAP_INTERPOLATE and left >= 0 and right < n_days:
+            if len(g) <= max_gap_interpolate and left >= 0 and right < n_days:
                 lv, rv = float(row[left]), float(row[right])
                 for k, idx in enumerate(g):
                     t = (k + 1) / (len(g) + 1)
@@ -272,12 +271,12 @@ def main() -> None:
 
     # anomalies
     print("Winsorizing...")
-    raw = winsorize(raw)
+    raw = winsorize(raw, config.winsor_k)
 
     # handle missings
     print("Interpolating gaps...")
     nan_mask = np.isnan(raw)
-    raw = interpolate_gaps(raw)
+    raw = interpolate_gaps(raw, config.max_gap_interpolate)
     nan_mask = np.isnan(raw)
 
     # log1p
