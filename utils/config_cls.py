@@ -42,6 +42,7 @@ class Config:
     seed: int = 17
     epochs: int = 50
     max_norm: float|None = None
+    patience: int|None = None
 
     # registries
     model: RegistryConfig = field(default_factory=RegistryConfig)
