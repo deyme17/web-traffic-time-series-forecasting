@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from .attention import build_attention
 from utils import Registry
 
 
@@ -18,7 +19,10 @@ class WTTSF_LSTM(nn.Module):
                  n_layers: int = 1, 
                  horizon: int = 365, 
                  dropout: float = 0., 
-                 dropout_cntx: float = 0.) -> None:
+                 dropout_ctx: float = 0.,
+                 attn_type: str = "none",
+                 attn_size: int = 128,
+                 attn_n_heads: int = 4) -> None:
         """
         Args:
             enc/dec_in_size: Number of features at each timestep for encoder/decoder.
@@ -26,15 +30,22 @@ class WTTSF_LSTM(nn.Module):
             n_layers: Number of stacked layers in the encoder and decoder LSTM.
             horizon: Number of future timesteps to predict.
             dropout: Dropout probability applied after each decoder layer output.
-            dropout_cntx: Dropout for encoder's output (context) that goes to the decoder.
+            dropout_ctx: Dropout for encoder's output (context) that goes to the decoder.
+            attn_type: Type of attention mechanism to use ('none' | 'additive' | 'dot' | 'multihead').
+            attn_size: Projection size inside the attention module.
+            attn_n_heads: Number of heads (for multihead attention only).
         """
         super().__init__()
+        assert attn_type in ("none", "additive", "dot", "multihead")
         self.enc_in_size = enc_in_size
         self.dec_in_size = dec_in_size
         self.enc_h_size = enc_h_size
         self.dec_h_size = dec_h_size
         self.n_layers = n_layers
         self.horizon = horizon
+        self.attn_type = attn_type
+        self.attn_size = attn_size
+        self.attn_n_heads = attn_n_heads
 
         # encoder
         self.encoder = nn.LSTM(
@@ -44,10 +55,24 @@ class WTTSF_LSTM(nn.Module):
             batch_first=True,
             dropout=dropout if n_layers > 1 else 0.,
         )
-        self.dropout_cntx = nn.Dropout(dropout_cntx)
+        self.dropout_ctx = nn.Dropout(dropout_ctx)
+        
+        # attention
+        self.attention = build_attention(
+            attn_type=attn_type,
+            query_size=dec_h_size,
+            key_size=enc_h_size,
+            attn_size=attn_size,
+            n_heads=attn_n_heads
+        )
+
+        if attn_type == "none":
+            context_size = enc_h_size * 2               # enc_context
+        else:
+            context_size = enc_h_size + enc_h_size * 2  # attention + enc_context
 
         # decoder
-        self.decoder_in = nn.LSTMCell(dec_in_size + enc_h_size * 2, dec_h_size)
+        self.decoder_in = nn.LSTMCell(dec_in_size + context_size, dec_h_size)
         self.decoder = nn.ModuleList([
             nn.LSTMCell(dec_h_size, dec_h_size)
             for _ in range(n_layers - 1)
@@ -60,10 +85,10 @@ class WTTSF_LSTM(nn.Module):
     def forward(self, enc_in: torch.Tensor, dec_in: torch.Tensor) -> torch.Tensor:
         """Forward pass of the model. Returns prediction with size (batch_size, horizon)."""
         # encoder
-        enc_state, (h_n, c_n) = self.encoder(enc_in)
-        enc_last = enc_state[:, -1, :]
-        enc_mean = enc_state.mean(dim=1)
-        context = self.dropout_cntx(torch.cat([enc_last, enc_mean], dim=-1))
+        enc_states, (h_n, c_n) = self.encoder(enc_in)
+        enc_last = enc_states[:, -1, :]
+        enc_mean = enc_states.mean(dim=1)
+        enc_context = self.dropout_ctx(torch.cat([enc_last, enc_mean], dim=-1))
 
         h = [h_n[i] for i in range(self.n_layers)]
         c = [c_n[i] for i in range(self.n_layers)]
@@ -71,6 +96,15 @@ class WTTSF_LSTM(nn.Module):
         # decoder
         preds = []
         for t in range(self.horizon):
+            # apply attention if provided
+            if self.attention is not None:
+                attn = self.attention(
+                    query=h[0],
+                    keys=enc_states
+                )
+                context = torch.cat([attn, enc_context], axis=1)
+            else:
+                context = enc_context
 
             x = torch.cat([dec_in[:, t, :], context], dim=-1)
             h[0], c[0] = self.decoder_in(x, (h[0], c[0]))
