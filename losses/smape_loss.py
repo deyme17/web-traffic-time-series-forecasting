@@ -1,8 +1,8 @@
-import torch.nn as nn
+from .custom_loss import CustomLoss
 import torch
 
 
-class SMAPELoss(nn.Module):
+class SMAPELoss(CustomLoss):
     """Symmetric Mean Absolute Percentage Error with smoothing."""
     def __init__(self, epsilon: float = 0.1):
         super().__init__()

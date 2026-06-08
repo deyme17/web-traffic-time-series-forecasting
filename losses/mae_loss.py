@@ -1,8 +1,8 @@
-import torch.nn as nn
+from .custom_loss import CustomLoss
 import torch
 
 
-class MAELoss(nn.Module):
+class MAELoss(CustomLoss):
     """Mean Absolute Error (L1) loss."""
     def __init__(self):
         super().__init__()

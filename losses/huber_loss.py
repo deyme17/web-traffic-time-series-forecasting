@@ -1,8 +1,8 @@
-import torch.nn as nn
+from .custom_loss import CustomLoss
 import torch
 
 
-class HuberLoss(nn.Module):
+class HuberLoss(CustomLoss):
     """Huber loss. It combines the best features of MSE and MAE."""
     def __init__(self, delta: float = 0.1):
         super().__init__()

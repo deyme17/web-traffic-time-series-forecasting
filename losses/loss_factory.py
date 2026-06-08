@@ -1,9 +1,9 @@
 from .register_losses import LOSSES
-import torch.nn as nn
+from .custom_loss import CustomLoss
 from utils import Config
 
 
-def get_loss(config: Config) -> nn.Module:
+def get_loss(config: Config) -> CustomLoss:
     loss_cfg = config.loss
     loss_factory = LOSSES.get(loss_cfg.name)
     if loss_factory is None:
