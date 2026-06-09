@@ -34,10 +34,12 @@ def get_dataloader(config: Config,
     )
     shuffle = config.shuffle and split == "train"
     drop_last = config.drop_last and split == "train"
+    b_size = config.train_batch_size if split == "train" \
+             else config.test_batch_size
 
     dl = DataLoader(
         dataset=dataset,
-        batch_size=config.batch_size,
+        batch_size=b_size,
         shuffle=shuffle,
         num_workers=config.n_workers,
         prefetch_factor=config.prefetch_factor,

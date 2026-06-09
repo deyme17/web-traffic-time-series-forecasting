@@ -28,7 +28,8 @@ class Config:
     first_date: str = "2015-07-01"
 
     # dataloader
-    batch_size: int = 512
+    train_batch_size: int = 512
+    test_batch_size: int = 512
 
     n_workers: int = 4
     persistent_workers: bool = False
