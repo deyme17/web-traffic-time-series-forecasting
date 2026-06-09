@@ -35,7 +35,7 @@ class WTTSF_Dataset(Dataset):
             seed: random seed for reproducibility.
         """
         super().__init__()
-        assert split in ("train", "val", "predict")
+        assert split in ("train", "valid", "predict")
         self.lookback = lookback
         self.horizon = horizon
         self.split = split
@@ -79,7 +79,7 @@ class WTTSF_Dataset(Dataset):
 
         self._rng = np.random.default_rng(seed)
 
-        if split in ("val", "predict"):
+        if split in ("valid", "predict"):
             self._fixed_start = self.n_days - self.lookback - back_offset
             assert self._fixed_start >= 0
 
