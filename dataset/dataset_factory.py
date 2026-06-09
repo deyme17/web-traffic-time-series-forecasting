@@ -34,8 +34,9 @@ def get_dataloader(config: Config,
     )
     shuffle = config.shuffle and split == "train"
     drop_last = config.drop_last and split == "train"
-    b_size = config.train_batch_size if split == "train" \
-             else config.test_batch_size
+    b_size = config.train_batch if split == "train" \
+             else config.valid_batch if split == "valid" \
+             else config.test_batch
 
     dl = DataLoader(
         dataset=dataset,
