@@ -1,0 +1,46 @@
+# interval
+lookback: 365
+horizon: 62
+
+# dataloader
+train_batch: 256
+valid_batch: 512
+test_batch: 512
+n_workers: 3
+
+# training
+seed: 17
+epochs: 20
+max_norm: 2
+
+# registries
+model: 
+    name: "LSTM"
+    parameters:
+        enc_h_size: 256
+        dec_h_size: 256
+        n_layers: 1
+        dropout: 0.
+        dropout_ctx: 0.
+        attn_type: "none"
+
+
+loss: 
+    name: "Huber"
+    parameters: {}
+
+
+optimizer: 
+    name: "AdamW"
+    parameters:
+        lr:  0.001
+        betas: [0.9, 0.999]
+        weight_decay: 0.00001
+        amsgrad: False
+
+
+scheduler: 
+    name: "CosineAnnealingLR"
+    parameters:
+        T_max: 20
+        eta_min: 0.00001
