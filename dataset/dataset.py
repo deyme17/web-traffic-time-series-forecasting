@@ -80,8 +80,11 @@ class WTTSF_Dataset(Dataset):
         self._rng = np.random.default_rng(seed)
 
         if split in ("valid", "predict"):
-            self._fixed_start = self.n_days - self.lookback - back_offset
-            assert self._fixed_start >= 0
+            self._fixed_start = self.n_days - self.lookback - self.horizon - back_offset
+            assert self._fixed_start >= 0, (
+                f"lookback ({lookback}) + horizon ({horizon}) + back_offset ({back_offset}) "
+                f"> n_days ({self.n_days})"
+            )
 
     @property
     def enc_dim(self) -> int:
@@ -160,7 +163,14 @@ class WTTSF_Dataset(Dataset):
         ], axis=1).astype(np.float32)   # [horizon, DEC_DIM]
 
         # target mask [horizon]
-        target_mask = ~self._nan_mask[idx, start + self.lookback : end]
+        nan_end = min(end, self._nan_mask.shape[1])
+        raw_mask = ~self._nan_mask[idx, start + self.lookback : nan_end]
+        # pad with False if the window extends past nan_mask
+        if len(raw_mask) < self.horizon:
+            pad = np.zeros(self.horizon - len(raw_mask), dtype=bool)
+            target_mask = np.concatenate([raw_mask, pad])
+        else:
+            target_mask = raw_mask
 
         sample = {
             "enc_input": torch.from_numpy(enc_input),
