@@ -165,7 +165,12 @@ if __name__ == "__main__":
         valid_loader = get_dataloader(config, split="valid")
 
     # model / optimizer / scheduler / loss
-    model = get_model(config).to(device)
+    model = get_model(
+        config,
+        enc_in_size=train_loader.dataset.enc_dim,
+        dec_in_size=train_loader.dataset.dec_dim,
+        horizon=train_loader.dataset.horizon,
+    ).to(device)
     optimizer = get_optimizer(config, model.parameters())
     scheduler = get_scheduler(config, optimizer)
     criterion = get_loss(config)
