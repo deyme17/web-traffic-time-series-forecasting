@@ -63,6 +63,7 @@ class Config:
     def from_dict(cls, cfg: dict[str, Any]) -> "Config":
         cfg = cfg.copy()
         cfg["model"] = RegistryConfig(**cfg.get("model", {}))
-        cfg["optimizer"] = RegistryConfig(**cfg.get("optimizer", {}))
         cfg["loss"] = RegistryConfig(**cfg.get("loss", {}))
+        cfg["optimizer"] = RegistryConfig(**cfg.get("optimizer", {}))
+        cfg["scheduler"] = RegistryConfig(**cfg.get("scheduler", {}))
         return cls(**cfg)
