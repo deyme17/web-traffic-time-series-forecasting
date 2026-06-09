@@ -33,6 +33,19 @@ def cosine_annealing_warm_restarts(optim: Optimizer,
         last_epoch=last_epoch,
     )
 
+@SCHEDULERS.register("CosineAnnealingLR")
+def cosine_annealing(optim: Optimizer,
+                                   T_max: int,
+                                   eta_min: float = 0.,
+                                   last_epoch: int = -1,
+                                   *args):
+    return lrs.CosineAnnealingLR(
+        optimizer=optim,
+        T_max=T_max,
+        eta_min=eta_min,
+        last_epoch=last_epoch,
+    )
+
 @SCHEDULERS.register("ReduceLROnPlateau")
 def reduce_lr_on_plateau(optim: Optimizer,
                          mode: str = 'min',
