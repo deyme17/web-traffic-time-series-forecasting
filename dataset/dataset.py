@@ -90,6 +90,14 @@ class WTTSF_Dataset(Dataset):
     @property
     def dec_dim(self) -> int:
         return DEC_DIM
+    
+    @property
+    def lookback(self) -> int:
+        return self.lookback
+    
+    @property
+    def horizon(self) -> int:
+        return self.horizon
 
     def __len__(self) -> int:
         return self.n_pages
