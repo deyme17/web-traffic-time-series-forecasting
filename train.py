@@ -128,7 +128,7 @@ def train_rnn(model: nn.Module,
             patient_level += 1
 
         # early stopping
-        if patient_level >= config.patience:
+        if config.patience is not None and patient_level >= config.patience:
             break
 
     return train_losses, val_losses
