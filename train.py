@@ -188,8 +188,8 @@ if __name__ == "__main__":
         optimizer.load_state_dict(state_dict["optim"])
 
         curr_epoch = state_dict["epoch"] + 1
-        train_losses = state_dict["train_losses"]
-        val_losses = state_dict["val_losses"]
+        train_losses = state_dict["train_loss"]
+        val_losses = state_dict["val_loss"]
         print(f"Resumed '{checkpoint_path}' at epoch {curr_epoch}.")
 
     # train
