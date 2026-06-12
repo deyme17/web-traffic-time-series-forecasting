@@ -27,7 +27,8 @@ model:
 
 loss: 
     name: "Huber"
-    parameters: {}
+    parameters:
+        delta: 0.5
 
 
 optimizer: 
