@@ -1,4 +1,4 @@
-from .model import MODELS
+from .model_register import MODELS
 from utils import Config
 import torch.nn as nn
 
