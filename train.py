@@ -3,10 +3,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lrs
+from torch_ema import ExponentialMovingAverage
 
 from tqdm import tqdm
 import yaml
 from pathlib import Path
+from contextlib import nullcontext
 
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
@@ -30,6 +32,7 @@ def train_rnn(model: nn.Module,
               train_loader: DataLoader, 
               valid_loader: Optional[DataLoader], 
               scheduler: Optional[lrs.LRScheduler], 
+              ema: Optional[ExponentialMovingAverage],
               curr_epoch: int = 0, 
               experiment_tag: str = "experiment",
               train_losses: Optional[List[float]] = None, 
@@ -38,7 +41,7 @@ def train_rnn(model: nn.Module,
     """
     RNN training loop. Return: (train_losses, val_losses|None).
     """
-    if device == torch.device("cuda"):
+    if device.type == "cuda":
         print("[INFO] CUDA is used for training.")
         torch.backends.cudnn.benchmark = True
     else:
@@ -75,6 +78,8 @@ def train_rnn(model: nn.Module,
                 clip_grad_norm_(model.parameters(), config.max_norm)
 
             optimizer.step()
+            if ema is not None: 
+                ema.update()
             
             train_loss += loss.item()
 
@@ -84,7 +89,10 @@ def train_rnn(model: nn.Module,
         # eval
         if valid_loader is not None:
             model.eval()
-            with torch.no_grad():
+            with (
+                ema.average_parameters() if ema is not None else nullcontext(),
+                torch.no_grad()
+            ):
                 for X in tqdm(valid_loader, desc="Valid", leave=False):
                     enc_in = X["enc_input"].to(device)
                     dec_in = X["dec_input"].to(device)
@@ -116,15 +124,17 @@ def train_rnn(model: nn.Module,
         # checkpoint
         if val_loss < best_val_loss:
             if epoch >= config.warmup_epochs:
-                save_checkpoint(
-                    model=model, 
-                    optim=optimizer,
-                    scheduler=scheduler,
-                    train_loss=train_losses, 
-                    val_loss=val_losses, 
-                    epoch=epoch,
-                    save_path=config.checkpoints_dir / f"{experiment_tag}_e{epoch + 1}_checkpoint.pt"
-                )
+                with ema.average_parameters() if ema is not None else nullcontext():
+                    save_checkpoint(
+                        model=model, 
+                        optim=optimizer,
+                        scheduler=scheduler,
+                        ema=ema,
+                        train_loss=train_losses, 
+                        val_loss=val_losses, 
+                        epoch=epoch,
+                        save_path=config.checkpoints_dir / f"{experiment_tag}_e{epoch + 1}_checkpoint.pt"
+                    )
             best_val_loss = val_loss
             patient_level = 0
         else:
@@ -180,6 +190,11 @@ if __name__ == "__main__":
     scheduler = get_scheduler(config, optimizer)
     criterion = get_loss(config)
 
+    # exp moving avg 
+    ema = ExponentialMovingAverage( 
+        model.parameters(), decay=config.ema_decay 
+    ) if config.ema_decay else None
+
     # load checkpoint
     curr_epoch = 0
     train_losses = []
@@ -193,6 +208,8 @@ if __name__ == "__main__":
         optimizer.load_state_dict(state_dict["optim"])
         if state_dict.get("scheduler") is not None:
             scheduler.load_state_dict(state_dict["scheduler"])
+        if ema is not None and state_dict.get("ema") is not None:
+            ema.load_state_dict(state_dict["ema"])
 
         curr_epoch = state_dict["epoch"] + 1
         train_losses = state_dict["train_loss"]
@@ -208,6 +225,7 @@ if __name__ == "__main__":
         train_loader=train_loader, 
         valid_loader=valid_loader, 
         scheduler=scheduler, 
+        ema=ema,
         curr_epoch=curr_epoch, 
         experiment_tag=args.tag,
         train_losses=train_losses, 

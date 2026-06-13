@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from torch import nn
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
+from torch_ema import ExponentialMovingAverage
 import torch
 
 
@@ -59,6 +60,7 @@ def read_csv(path: Path) -> Tuple[List[str], np.ndarray]:
 def save_checkpoint(model: nn.Module,
                     optim: Optimizer, 
                     scheduler: Optional[LRScheduler],
+                    ema: Optional[ExponentialMovingAverage],
                     train_loss: List[float], 
                     val_loss: Optional[List[float]], 
                     epoch: int, save_path: Path|str) -> None:
@@ -67,6 +69,7 @@ def save_checkpoint(model: nn.Module,
         "epoch": epoch,
         "model": model.state_dict(),
         "optim": optim.state_dict(),
+        "ema": ema.state_dict(),
         "scheduler": scheduler.state_dict(),
         "train_loss": train_loss,
         "val_loss": val_loss,
