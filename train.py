@@ -161,10 +161,12 @@ if __name__ == "__main__":
     set_seed(config.seed)
 
     # data
-    train_loader = get_dataloader(config, split="train")
-    valid_loader = None
     if args.use_valid:
+        train_loader = get_dataloader(config, split="train")
         valid_loader = get_dataloader(config, split="valid")
+    else:
+        train_loader = get_dataloader(config, split="predict")
+        valid_loader = None
 
     # model / optimizer / scheduler / loss
     model = get_model(
