@@ -11,13 +11,14 @@ from utils import Config
 def get_dataset(data_root: Path,
                 config: Config,
                 split: str = "train",
+                back_offset: int = 0,
                 transforms = None) -> WTTSF_Dataset:
     return WTTSF_Dataset(
         data_root=data_root,
         lookback=config.lookback,
         horizon=config.horizon,
         split=split,
-        back_offset=0,
+        back_offset=back_offset,
         transforms=transforms,
         seed=config.seed if split == "train" else None,
     )
@@ -25,11 +26,13 @@ def get_dataset(data_root: Path,
 
 def get_dataloader(config: Config,
                    split: str = "train",
+                   back_offset: int = 0,
                    transforms = None) -> DataLoader:
     dataset = get_dataset(
         data_root=config.data_dir,
         config=config,
         split=split,
+        back_offset=back_offset,
         transforms=transforms,
     )
     shuffle = config.shuffle and split == "train"
