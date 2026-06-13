@@ -162,10 +162,10 @@ if __name__ == "__main__":
 
     # data
     if args.use_valid:
-        train_loader = get_dataloader(config, split="train")
-        valid_loader = get_dataloader(config, split="valid")
+        train_loader = get_dataloader(config, split="train", back_offset=config.horizon)
+        valid_loader = get_dataloader(config, split="valid", back_offset=0)
     else:
-        train_loader = get_dataloader(config, split="predict")
+        train_loader = get_dataloader(config, split="train", back_offset=0)
         valid_loader = None
 
     # model / optimizer / scheduler / loss
