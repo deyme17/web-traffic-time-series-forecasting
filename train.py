@@ -34,11 +34,11 @@ def train_rnn(model: nn.Module,
               experiment_tag: str = "experiment",
               train_losses: Optional[List[float]] = None, 
               val_losses: Optional[List[float]] = None,
-              device: str = "cpu") -> Tuple[List[float], Optional[List[float]]]:
+              device: torch.device = torch.device("cpu")) -> Tuple[List[float], Optional[List[float]]]:
     """
     RNN training loop. Return: (train_losses, val_losses|None).
     """
-    if device == "cuda":
+    if device == torch.device("cuda"):
         print("[INFO] CUDA is used for training.")
         torch.backends.cudnn.benchmark = True
     else:
