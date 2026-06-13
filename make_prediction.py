@@ -14,7 +14,7 @@ from dataset import get_dataloader
 
 
 
-def predict(model: nn.Module,
+def _predict(model: nn.Module,
             loader: DataLoader,
             device: torch.device) -> tuple[np.ndarray, List[str]]:
     """Run inference over all pages."""
@@ -36,6 +36,27 @@ def predict(model: nn.Module,
             all_preds.append(raw_pred.cpu().numpy())
 
     return np.concatenate(all_preds, axis=0)
+
+
+
+def predict_checkpoint(checkpoint: Path, 
+                       config: Config, 
+                       loader: DataLoader, 
+                       device: torch.device) -> np.ndarray:
+    """Make prediction for a specific checkpoint."""
+    model = get_model(
+        config,
+        enc_in_size=loader.dataset.enc_dim,
+        dec_in_size=loader.dataset.dec_dim,
+        horizon=loader.dataset.horizon,
+    ).to(device)
+    model, _ = load_checkpoint(
+        checkpoint,
+        model,
+        map_location=device
+    )
+    print(f"Loaded checkpoint: {checkpoint}")
+    return _predict(model, loader, device)
 
 
 
@@ -78,43 +99,59 @@ def build_submission(preds: np.ndarray,
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="WTTSF competition inference script.")
-    parser.add_argument("--config", type=str, required=True, help="Path to experiment config (.yaml).")
-    parser.add_argument("--checkpoint", type=str, required=True, help="Path to model checkpoint (.pt).")
+    parser.add_argument("--configs", nargs="+", required=True, help="Path to experiment config(s) (.yaml).")
+    parser.add_argument("--checkpoints", nargs="+", required=True, help="Path to model checkpoint(s) (.pt).")
+    parser.add_argument("--weights", nargs="+", help="Weight for each checkpoint.")
     parser.add_argument("--key", type=str, default="data/key_2.csv", help="Path to key_2.csv.")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     parser.add_argument("--out", type=str, default="submissions/submission.csv", help="Output CSV path.")
     args = parser.parse_args()
 
-    config_path = Path(args.config)
-    checkpoint_path = Path(args.checkpoint)
+    config_paths = [Path(p) for p in args.configs]
+    checkpoint_paths = [Path(p) for p in args.checkpoints]
+    weights = np.array(list(map(float, args.weights))) if args.weights else None
     key_path = Path(args.key)
     out_path = Path(args.out)
 
-    for p in (config_path, checkpoint_path, key_path):
+    # validation
+    if len(config_paths) != len(checkpoint_paths):
+        raise ValueError(
+            f"Expected equal number of configs and checkpoints "
+            f"(got {len(config_paths)} configs and "
+            f"{len(checkpoint_paths)} checkpoints)."
+        )
+    if weights is not None and len(weights) != len(config_paths):
+        raise ValueError(
+            f"Weights must match number of models "
+            f"({len(weights)} vs {len(config_paths)})"
+        )
+    for p in (*config_paths, *checkpoint_paths, Path(args.key)):
         if not p.exists():
-            raise FileNotFoundError(f"Not found: {p}")
-
-    with open(config_path) as f:
-        config = Config.from_dict(yaml.safe_load(f))
-
+            raise FileNotFoundError(p)
+        
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
-    set_seed(config.seed)
+    set_seed(args.seed)
+        
+    all_preds = []
+    for config_path, checkpoint_path in zip(config_paths, checkpoint_paths):
+        # config
+        with open(config_path) as f:
+            config = Config.from_dict(yaml.safe_load(f))
 
-    # data
-    predict_loader = get_dataloader(config, split="predict")
+        # data
+        predict_loader = get_dataloader(config, split="predict")
 
-    # model
-    model = get_model(
-        config,
-        enc_in_size=predict_loader.dataset.enc_dim,
-        dec_in_size=predict_loader.dataset.dec_dim,
-        horizon=predict_loader.dataset.horizon,
-    ).to(device)
-    model, _ = load_checkpoint(path=checkpoint_path, model=model, map_location=device)
-    print(f"Loaded checkpoint: {checkpoint_path}")
-
-    # inference
-    preds = predict(model, predict_loader, device)
+        # prediction
+        pred = predict_checkpoint(checkpoint_path, config, predict_loader, device)
+        all_preds.append(pred)
+    
+    # combine preds
+    preds = np.stack(all_preds)
+    if weights is None:
+        preds = preds.mean(axis=0)
+    else:
+        preds = np.average(preds, axis=0, weights=weights)
     print(f"Predictions shape: {preds.shape} min={preds.min():.1f} max={preds.max():.1f}")
 
     # page names (same order as the dataset)
