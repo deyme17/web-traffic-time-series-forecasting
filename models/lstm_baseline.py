@@ -4,7 +4,7 @@ from .attention import build_attention
 
 
 
-class WTTSF_LSTM(nn.Module):
+class BaselineLSTM(nn.Module):
     """Seq-to-seq LSTM RNN for web traffic time series forecasting."""
     def __init__(self, 
                  enc_in_size: int, 
