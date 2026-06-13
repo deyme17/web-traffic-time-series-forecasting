@@ -72,7 +72,7 @@ class WTTSF_LSTM(nn.Module):
             context_size = enc_h_size + enc_h_size * 2  # attention + enc_context
 
         # decoder
-        self.decoder_in = nn.LSTMCell(dec_in_size + context_size, dec_h_size)
+        self.decoder_in = nn.LSTMCell(dec_in_size + context_size + 1, dec_h_size)
         self.decoder = nn.ModuleList([
             nn.LSTMCell(dec_h_size, dec_h_size)
             for _ in range(n_layers - 1)
@@ -95,6 +95,7 @@ class WTTSF_LSTM(nn.Module):
         
         # decoder
         preds = []
+        prev_pred = torch.zeros(enc_in.shape[0], 1, device=enc_in.device)
         for t in range(self.horizon):
             # apply attention if provided
             if self.attention is not None:
@@ -106,7 +107,7 @@ class WTTSF_LSTM(nn.Module):
             else:
                 context = enc_context
 
-            x = torch.cat([dec_in[:, t, :], context], dim=-1)
+            x = torch.cat([prev_pred, dec_in[:, t, :], context], dim=-1)
             h[0], c[0] = self.decoder_in(x, (h[0], c[0]))
             out = h[0]
 
@@ -114,6 +115,8 @@ class WTTSF_LSTM(nn.Module):
                 h[i + 1], c[i + 1] = dec_cell(out, (h[i + 1], c[i + 1]))
                 out = h[i + 1]
 
-            preds.append(self.out_proj(self.dropout(out)))
+            prev_pred = self.out_proj(self.dropout(out))
+            preds.append(prev_pred)
+            prev_pred = prev_pred.detach()
 
         return torch.cat(preds, dim=-1)
