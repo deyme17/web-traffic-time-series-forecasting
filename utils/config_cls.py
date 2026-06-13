@@ -43,6 +43,7 @@ class Config:
     # training
     seed: int = 17
     epochs: int = 50
+    warmup_epochs: int = 0
     max_norm: float|None = None
     patience: int|None = None
 

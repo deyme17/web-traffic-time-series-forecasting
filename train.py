@@ -21,8 +21,6 @@ from schedulers import get_scheduler
 from dataset import get_dataloader
 from losses import get_loss
 
-WARMUP_EPOCH = 10
-
 
 
 def train_rnn(model: nn.Module, 
@@ -117,7 +115,7 @@ def train_rnn(model: nn.Module,
         
         # checkpoint
         if val_loss < best_val_loss:
-            if epoch >= WARMUP_EPOCH:
+            if epoch >= config.warmup_epochs:
                 save_checkpoint(
                     model=model, 
                     optim=optimizer,
