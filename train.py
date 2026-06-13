@@ -34,20 +34,21 @@ def train_rnn(model: nn.Module,
               scheduler: Optional[lrs.LRScheduler], 
               curr_epoch: int = 0, 
               experiment_tag: str = "experiment",
-              train_losses: List[float] = None, 
+              train_losses: Optional[List[float]] = None, 
               val_losses: Optional[List[float]] = None,
               device: str = "cpu") -> Tuple[List[float], Optional[List[float]]]:
     """
     RNN training loop. Return: (train_losses, val_losses|None).
     """
-    if torch.cuda.is_available():
+    if device == "cuda":
         print("[INFO] CUDA is used for training.")
         torch.backends.cudnn.benchmark = True
     else:
         print("[WARNING] CUDA is not available.")
 
     if train_losses is None: train_losses = []
-    if val_losses is None: val_losses = []
+    if val_losses is None and valid_loader is not None: 
+        val_losses = []
 
     best_val_loss = float('inf')
     patient_level = 0
@@ -64,7 +65,7 @@ def train_rnn(model: nn.Module,
             target = X["target"].to(device)
             target_mask = X["target_mask"].to(device)
 
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
             
             out = model(enc_in, dec_in)
             loss = criterion(out, target, target_mask)
@@ -98,9 +99,9 @@ def train_rnn(model: nn.Module,
                     val_loss += loss.item()
 
             val_loss /= len(valid_loader)
+            val_losses.append(val_loss)
         else:
             val_loss = train_loss
-        val_losses.append(val_loss)
 
         # schedule lr
         if scheduler is not None:
@@ -120,6 +121,7 @@ def train_rnn(model: nn.Module,
                 save_checkpoint(
                     model=model, 
                     optim=optimizer,
+                    scheduler=scheduler,
                     train_loss=train_losses, 
                     val_loss=val_losses, 
                     epoch=epoch,
