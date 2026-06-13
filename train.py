@@ -193,6 +193,8 @@ if __name__ == "__main__":
             map_location=device,
         )
         optimizer.load_state_dict(state_dict["optim"])
+        if state_dict.get("scheduler") is not None:
+            scheduler.load_state_dict(state_dict["scheduler"])
 
         curr_epoch = state_dict["epoch"] + 1
         train_losses = state_dict["train_loss"]
