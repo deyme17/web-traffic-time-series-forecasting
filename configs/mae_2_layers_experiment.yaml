@@ -11,6 +11,7 @@ n_workers: 3
 # training
 seed: 17
 epochs: 20
+warmup_epochs: 10
 max_norm: 2
 
 # registries
