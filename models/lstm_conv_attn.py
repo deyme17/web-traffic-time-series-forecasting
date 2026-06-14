@@ -24,13 +24,13 @@ class ConvAttnLSTM(nn.Module):
         Args:
             enc/dec_in_size: Number of features at each timestep for encoder/decoder.
             enc/dec_h_size: Hidden state size of encoder/decoder.
-            n_layers: Number of stacked layers in the encoder and decoder LSTM.
+            n_layers: Number of stacked layers in encoder and decoder LSTM.
             horizon: Number of future timesteps to predict.
             lookback: Number of past timesteps for attention window.
             dropout: Dropout probability applied after each decoder layer output.
-            dropout_ctx: Dropout for encoder's output (context) that goes to the decoder.
-            readout_size: Depth of compressed enc_states readout in ConvAttention
-            fingerprint_size: Size of the 'fingerprint' given by ConvFingerprint.
+            dropout_ctx: Dropout on encoder hidden state passed to decoder init.
+            readout_size: Compressed readout depth in ConvAttention.
+            fingerprint_size: CNN output size for ConvFingerprint.
             attn_n_heads: Number of attention heads in ConvAttention.
         """
         super().__init__()
@@ -54,6 +54,14 @@ class ConvAttnLSTM(nn.Module):
             batch_first=True,
             dropout=dropout if n_layers > 1 else 0.
         )
+
+        # enc-dec transition
+        self.enc_to_dec_h = nn.ModuleList([
+            nn.Linear(enc_h_size, dec_h_size) for _ in range(n_layers)
+        ])
+        self.enc_to_dec_c = nn.ModuleList([
+            nn.Linear(enc_h_size, dec_h_size) for _ in range(n_layers)
+        ])
         self.dropout_ctx = nn.Dropout(dropout_ctx)
 
         # attention
@@ -66,13 +74,11 @@ class ConvAttnLSTM(nn.Module):
             lookback=lookback,
             n_heads=attn_n_heads
         )
-
-        context_size = enc_h_size * 2  # enc_last + enc_mean
         attn_out_size = readout_size * attn_n_heads
 
         # decoder
         self.decoder_in = nn.LSTMCell(
-            dec_in_size + context_size + attn_out_size + 1, 
+            1 + dec_in_size + attn_out_size,
             dec_h_size
         )
         self.decoder = nn.ModuleList([
@@ -84,26 +90,35 @@ class ConvAttnLSTM(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.out_proj = nn.Linear(dec_h_size, 1)
 
+    def _init_decoder_state(self, 
+                            h_n: torch.Tensor, 
+                            c_n: torch.Tensor
+                            ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+        """Project encoder final states into decoder hidden states."""
+        h, c = [], []
+        for i in range(self.n_layers):
+            hi = self.dropout_ctx(h_n[i])
+            ci = self.dropout_ctx(c_n[i])
+            h.append(torch.tanh(self.enc_to_dec_h[i](hi)))
+            c.append(torch.tanh(self.enc_to_dec_c[i](ci)))
+        return h, c
+
     def forward(self, enc_in: torch.Tensor, dec_in: torch.Tensor) -> torch.Tensor:
         """Forward pass of the model. Returns prediction with size (batch_size, horizon)."""
         # encoder
         enc_states, (h_n, c_n) = self.encoder(enc_in)
-        enc_last = enc_states[:, -1, :]
-        enc_mean = enc_states.mean(dim=1)
-        enc_context = self.dropout_ctx(torch.cat([enc_last, enc_mean], dim=-1))
-
-        h = [h_n[i] for i in range(self.n_layers)]
-        c = [c_n[i] for i in range(self.n_layers)]
 
         # attention
         attn = self.conv_attn(enc_in, enc_states)
 
         # decoder
+        h, c = self._init_decoder_state(h_n, c_n)
+
         preds = []
         prev_pred = torch.zeros(enc_in.size(0), 1, device=enc_in.device)
 
         for t in range(self.horizon):
-            x = torch.cat([prev_pred, dec_in[:, t, :], attn[:, t, :], enc_context], dim=-1)
+            x = torch.cat([prev_pred, dec_in[:, t, :], attn[:, t, :]], dim=-1)
             h[0], c[0] = self.decoder_in(x, (h[0], c[0]))
             out = h[0]
 
@@ -113,6 +128,6 @@ class ConvAttnLSTM(nn.Module):
 
             pred = self.out_proj(self.dropout(out))
             preds.append(pred)
-            prev_pred = pred.detach()
+            prev_pred = pred
 
         return torch.cat(preds, dim=-1)
