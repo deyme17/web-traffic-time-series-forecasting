@@ -1,0 +1,53 @@
+# interval
+lookback: 365
+horizon: 62
+
+# dataloader
+train_batch: 128
+valid_batch: 256
+test_batch: 256
+n_workers: 4
+
+# training
+seed: 177
+epochs: 50
+warmup_epochs: 5
+max_norm: 1.5
+patience: 10
+ema_decay: 0.999
+
+# registries
+model: 
+    name: "LSTM_ConvAttn"
+    parameters:
+        enc_h_size: 256
+        dec_h_size: 256
+        n_layers: 1
+        dropout: 0.1
+        dropout_ctx: 0.1
+        readout_size: 128
+        fingerprint_size: 16
+        attn_n_heads: 4
+
+
+loss: 
+    name: "MAE"
+    parameters: {}
+
+
+optimizer: 
+    name: "AdamW"
+    parameters:
+        lr:  0.0007
+        betas: [0.9, 0.999]
+        weight_decay: 0.0007
+        amsgrad: False
+
+
+scheduler: 
+    name: "ReduceLROnPlateau"
+    parameters:
+        mode: 'min'
+        factor: 0.5
+        patience: 5
+        min_lr: 0.00001
