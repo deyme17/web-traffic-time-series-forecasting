@@ -185,6 +185,7 @@ if __name__ == "__main__":
         enc_in_size=train_loader.dataset.enc_dim,
         dec_in_size=train_loader.dataset.dec_dim,
         horizon=train_loader.dataset.horizon,
+        lookback=train_loader.dataset.lookback,
     ).to(device)
     optimizer = get_optimizer(config, model.parameters())
     scheduler = get_scheduler(config, optimizer)

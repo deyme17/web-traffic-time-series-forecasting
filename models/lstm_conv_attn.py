@@ -18,7 +18,8 @@ class ConvAttnLSTM(nn.Module):
                  dropout_ctx: float = 0.,
                  readout_size: int = 128,
                  fingerprint_size: int = 16,
-                 attn_n_heads: int = 4) -> None:
+                 attn_n_heads: int = 4,
+                 **kwargs) -> None:
         """
         Args:
             enc/dec_in_size: Number of features at each timestep for encoder/decoder.

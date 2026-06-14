@@ -17,7 +17,8 @@ class BaselineLSTM(nn.Module):
                  dropout_ctx: float = 0.,
                  attn_type: str = "none",
                  attn_size: int = 128,
-                 attn_n_heads: int = 4) -> None:
+                 attn_n_heads: int = 4,
+                 **kwargs) -> None:
         """
         Args:
             enc/dec_in_size: Number of features at each timestep for encoder/decoder.
