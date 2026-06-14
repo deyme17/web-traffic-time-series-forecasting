@@ -74,17 +74,22 @@ class ConvAttention(nn.Module):
                       enc_states: torch.Tensor) -> torch.Tensor:
         B = enc_input.size(0)
 
-        fprint = self.fingerprint(enc_input[:, :, :self.n_signal])         # enc_in_size -> fingerprint_size
-        scores = self.focus(fprint)                                             # attn_window * n_heads
-        scores = scores.view(B, self.attn_window, self.n_heads)                 # attn_window, n_heads
+        fprint = self.fingerprint(enc_input[:, :, :self.n_signal])              # enc_in_size -> fingerprint_size
+        scores = self.focus(fprint).view(B, self.attn_window, self.n_heads)     # attn_window, n_heads
         weights = F.softmax(scores, dim=1)                                      # normalize
-        weights = weights.unsqueeze(1).unsqueeze(1)                             # [B, 1, 1, ...]
 
         readout = self.readout_proj(enc_states)                                 # enc_h_size -> readout_size
         readout = readout.permute(0, 2, 1)                                      # lookback, <-> readout_size
-        readout = readout.unfold(dimension=2, size=self.attn_window, step=1)    # [B, readout_size, horizon, attn_window]
-        readout = readout.unsqueeze(-1)                                         # [B, readout_size, horizon, attn_window, 1]
+            
+        heads = []
+        for head_i in range(self.n_heads):
+            w = weights[:, :, head_i]                                           # [B, attn_window]
+            ro = readout.reshape(1, B * self.readout_size, self.lookback)       # [1, readout_size*B, lookback]
+            kernel = w.repeat_interleave(self.readout_size, dim=0)              # [B*readout_size, attn_window]
+            kernel = kernel.unsqueeze(1)                                        # [B*readout_size, 1, attn_window]
+            out = F.conv1d(ro, kernel, groups=B * self.readout_size)            # [1, B*readout_size, horizon]
+            heads.append(out.view(B, self.readout_size, self.horizon))          # [B, readout_size, horizon]
 
-        attention = (readout * weights).sum(dim=3)                              # [B, readout_size, horizon, n_heads]
-        attention = attention.permute(0, 2, 1, 3).contiguous()                  # [B, horizon, readout_size, n_heads]
-        return attention.view(B, self.horizon, self.readout_size*self.n_heads)  # [B, horizon, readout_size * n_heads]
+        attn = torch.stack(heads, dim=-1)                                       # [B, readout_size, horizon, n_heads]
+        attn = attn.permute(0, 2, 1, 3).contiguous()                            # [B, horizon, readout_size, n_heads]
+        return attn.view(B, self.horizon, self.readout_size * self.n_heads)     # [B, horizon, readout_size * n_heads]
