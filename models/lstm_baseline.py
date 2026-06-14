@@ -116,8 +116,6 @@ class BaselineLSTM(nn.Module):
 
             pred = self.out_proj(self.dropout(out))
             preds.append(pred)
-            pred = pred.detach()
-
-            prev_pred = pred
+            prev_pred = pred.detach()
 
         return torch.cat(preds, dim=-1)
