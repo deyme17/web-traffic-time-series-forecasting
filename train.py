@@ -195,6 +195,7 @@ if __name__ == "__main__":
     ema = ExponentialMovingAverage( 
         model.parameters(), decay=config.ema_decay 
     ) if config.ema_decay else None
+    print(f"ExponentialMovingAverage is used: {ema is not None}")
 
     # load checkpoint
     curr_epoch = 0
