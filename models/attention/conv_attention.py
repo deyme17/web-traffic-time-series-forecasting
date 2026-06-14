@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from utils.constants import FINGERPRINT_SIGNAL
 
 
 
@@ -35,7 +36,6 @@ class ConvFingerprint(nn.Module):
 class ConvAttention(nn.Module):
     """Attention on the encoder fingerprint given by depthwise conv."""
     def __init__(self,
-                 enc_in_size: int,
                  enc_h_size: int,
                  readout_size: int,
                  fingerprint_size: int,
@@ -45,7 +45,6 @@ class ConvAttention(nn.Module):
                  n_heads: int = 4):
         """
         Args:
-            enc_in_size: Encoder input size.
             enc_h_size: Encoder hidden size.
             readout_size: Compressed readout depth.
             fingerprint_size: CNN output size.
@@ -60,8 +59,9 @@ class ConvAttention(nn.Module):
         self.horizon = horizon
         self.lookback = lookback
         self.attn_window = attn_window
+        self.n_signal = FINGERPRINT_SIGNAL
 
-        self.fingerprint = ConvFingerprint(enc_in_size, 
+        self.fingerprint = ConvFingerprint(self.n_signal, 
                                            fingerprint_size,
                                            lookback)
         self.readout_proj = nn.Sequential(
@@ -74,7 +74,7 @@ class ConvAttention(nn.Module):
                       enc_states: torch.Tensor) -> torch.Tensor:
         B = enc_input.size(0)
 
-        fprint = self.fingerprint(enc_input)                                    # enc_in_size -> fingerprint_size
+        fprint = self.fingerprint(enc_input[:, :, :self.n_signal])         # enc_in_size -> fingerprint_size
         scores = self.focus(fprint)                                             # attn_window * n_heads
         scores = scores.view(B, self.attn_window, self.n_heads)                 # attn_window, n_heads
         weights = F.softmax(scores, dim=1)                                      # normalize

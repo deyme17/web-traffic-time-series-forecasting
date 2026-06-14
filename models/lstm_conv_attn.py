@@ -58,7 +58,6 @@ class ConvAttnLSTM(nn.Module):
 
         # attention
         self.conv_attn = ConvAttention(
-            enc_in_size=enc_in_size,
             enc_h_size=enc_h_size,
             readout_size=readout_size,
             fingerprint_size=fingerprint_size,
