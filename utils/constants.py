@@ -32,3 +32,4 @@ N_PAGE_STAT = 3     # page_mean, page_std, page_vc
 N_PAGE = N_PAGE_SCALAR + N_PAGE_STAT + N_PAGE_CAT
 ENC_DIM = 1 + N_LAGS + N_LAGS + N_TEMPORAL + N_PAGE
 DEC_DIM = ENC_DIM - 1
+FINGERPRINT_SIGNAL = 1 + N_LAGS # fingerprint needs only hits and lags
