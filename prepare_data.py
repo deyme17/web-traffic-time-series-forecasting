@@ -119,21 +119,13 @@ def interpolate_gaps(data: np.ndarray, max_gap_interpolate: int) -> np.ndarray:
 def drop_dead_pages(data: np.ndarray,
                     pages: List[str],
                     horizon: int,
-                    nan_threshold: float
                     ) -> Tuple[np.ndarray, List[str], np.ndarray]:
     """
-    Drops pages where:
-        - NaN fraction > nan_threshold
-        - all zeros in the last `horizon` days (dead page)
+    Drops pages where: all zeros in the last `horizon` days (dead page)
     Returns (filtered_data, filtered_pages, keep_mask).
     """
-    nan_frac = np.isnan(data).mean(axis=1)
-    alive = ~np.all(np.isnan(data[:, -horizon:]) | (data[:, -horizon:] == 0), axis=1)
-    keep_mask = (nan_frac <= nan_threshold) & alive
-
-    print(f"\tdropped {(~keep_mask).sum()} pages "
-          f"(nan>{nan_threshold:.0%} or dead). kept {keep_mask.sum()}.")
-
+    keep_mask = ~np.all(np.isnan(data[:, -horizon:]) | (data[:, -horizon:] == 0), axis=1)
+    print(f"\tdropped {(~keep_mask).sum()} dead pages). kept {keep_mask.sum()}.")
     return data[keep_mask], [p for p, k in zip(pages, keep_mask) if k], keep_mask
 
 
@@ -267,7 +259,7 @@ def main() -> None:
     pages, raw = read_csv(csv_path)
 
     # dead pages
-    raw, pages, _ = drop_dead_pages(raw, pages, config.horizon, config.nan_threshold)
+    raw, pages, _ = drop_dead_pages(raw, pages, config.horizon)
 
     # anomalies
     print("Winsorizing...")
@@ -333,7 +325,6 @@ def main() -> None:
         horizon = config.horizon,
         lag_days = LAG_DAYS,
         first_date = config.first_date,
-        nan_threshold = config.nan_threshold,
     )
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
