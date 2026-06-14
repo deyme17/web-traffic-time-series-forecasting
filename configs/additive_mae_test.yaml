@@ -11,7 +11,7 @@ n_workers: 4
 # training
 seed: 177
 epochs: 25
-warmup_epochs: 5
+warmup_epochs: 15
 max_norm: 2
 patience: 10
 
