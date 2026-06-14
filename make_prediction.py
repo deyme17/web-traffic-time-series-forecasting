@@ -1,11 +1,14 @@
-from typing import List
+from typing import List, Tuple, Optional
+from contextlib import nullcontext
+from pathlib import Path
 import yaml
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+
 import torch
 import torch.nn as nn
-from pathlib import Path
-from tqdm import tqdm
+from torch_ema import ExponentialMovingAverage
 from torch.utils.data import DataLoader
 
 from utils import Config, load_checkpoint, set_seed
@@ -15,13 +18,17 @@ from dataset import get_dataloader
 
 
 def _predict(model: nn.Module,
-            loader: DataLoader,
-            device: torch.device) -> tuple[np.ndarray, List[str]]:
+             loader: DataLoader,
+             ema: Optional[ExponentialMovingAverage] = None,
+             device: torch.device = torch.device("cpu")) -> Tuple[np.ndarray, List[str]]:
     """Run inference over all pages."""
     model.eval()
     all_preds = []
 
-    with torch.no_grad():
+    with (
+        ema.average_parameters() if ema is not None else nullcontext(),
+        torch.no_grad()
+    ):
         for X in tqdm(loader, desc="Predicting"):
             enc_in = X["enc_input"].to(device)
             dec_in = X["dec_input"].to(device)
@@ -50,13 +57,20 @@ def predict_checkpoint(checkpoint: Path,
         dec_in_size=loader.dataset.dec_dim,
         horizon=loader.dataset.horizon,
     ).to(device)
-    model, _ = load_checkpoint(
+    model, state_dict = load_checkpoint(
         checkpoint,
         model,
         map_location=device
     )
     print(f"Loaded checkpoint: {checkpoint}")
-    return _predict(model, loader, device)
+
+    ema = None
+    if config.ema_decay is not None and state_dict.get("ema") is not None:
+        ema = ExponentialMovingAverage(model.parameters(), decay=config.ema_decay)
+        ema.load_state_dict(state_dict["ema"])
+        print("ExponentialMovingAverage is used for inferance.")
+
+    return _predict(model, loader, ema, device)
 
 
 
