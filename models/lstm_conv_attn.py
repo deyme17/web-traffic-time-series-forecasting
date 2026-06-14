@@ -40,6 +40,7 @@ class ConvAttnLSTM(nn.Module):
         self.dec_h_size = dec_h_size
         self.n_layers = n_layers
         self.horizon = horizon
+        self.lookback = lookback
         self.attn_window = lookback - horizon + 1
         self.readout_size = readout_size
         self.fingerprint_size = fingerprint_size
@@ -63,6 +64,7 @@ class ConvAttnLSTM(nn.Module):
             fingerprint_size=fingerprint_size,
             attn_window=self.attn_window,
             horizon=horizon,
+            lookback=lookback,
             n_heads=attn_n_heads
         )
 

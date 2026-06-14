@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 class ConvFingerprint(nn.Module):
     """CNN that produces a 'fingerprint' of the input timeseries."""
-    def __init__(self, in_ch: int = 1, out_size: int = 16):
+    def __init__(self, in_ch: int = 1, out_size: int = 16, lookback: int = 365):
         super().__init__()
         self.convnet = nn.Sequential(
             nn.Conv1d(in_ch, 16, kernel_size=7, padding=3), nn.ReLU(),
@@ -20,7 +20,7 @@ class ConvFingerprint(nn.Module):
             nn.MaxPool1d(2),
         )
         self.fc = nn.Sequential(
-            nn.LazyLinear(512), nn.SiLU(),
+            nn.Linear(64 * (lookback // 8), 512), nn.SiLU(),
             nn.Linear(512, out_size), nn.SiLU(),
         )
 
@@ -41,24 +41,29 @@ class ConvAttention(nn.Module):
                  fingerprint_size: int,
                  attn_window: int,
                  horizon: int,
+                 lookback: int,
                  n_heads: int = 4):
         """
         Args:
-            enc_in_size: encoder input size
-            enc_h_size: encoder hidden size
-            readout_size: compressed readout depth (FC after encoder)
-            fingerprint_size: CNN output size
-            attn_window: lookback - horizon + 1
-            horizon: prediction window
-            n_heads: number of attention heads
+            enc_in_size: Encoder input size.
+            enc_h_size: Encoder hidden size.
+            readout_size: Compressed readout depth.
+            fingerprint_size: CNN output size.
+            attn_window: Lookback - horizon + 1.
+            horizon: Prediction window.
+            lookback: Past timestep size.
+            n_heads: Number of attention heads.
         """
         super().__init__()
         self.n_heads = n_heads
         self.readout_size = readout_size
         self.horizon = horizon
+        self.lookback = lookback
         self.attn_window = attn_window
 
-        self.fingerprint = ConvFingerprint(enc_in_size, fingerprint_size)
+        self.fingerprint = ConvFingerprint(enc_in_size, 
+                                           fingerprint_size,
+                                           lookback)
         self.readout_proj = nn.Sequential(
             nn.Linear(enc_h_size, readout_size),
             nn.SiLU(),
