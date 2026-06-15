@@ -9,10 +9,10 @@ test_batch: 256
 n_workers: 4
 
 # training
-seed: 177
-epochs: 25
-warmup_epochs: 5
-max_norm: 1.5
+seed: 228
+epochs: 21
+warmup_epochs: 18
+max_norm: 2
 patience: 10
 ema_decay: 0.999
 
@@ -40,14 +40,12 @@ optimizer:
     parameters:
         lr:  0.0007
         betas: [0.9, 0.999]
-        weight_decay: 0.0007
+        weight_decay: 0.0001
         amsgrad: False
 
 
 scheduler: 
-    name: "ReduceLROnPlateau"
+    name: "CosineAnnealingLR"
     parameters:
-        mode: 'min'
-        factor: 0.5
-        patience: 5
-        min_lr: 0.00001
+        T_max: 25
+        eta_min: 0.0001
