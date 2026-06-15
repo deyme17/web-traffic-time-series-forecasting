@@ -253,7 +253,7 @@ def main() -> None:
     else:
         config = Config()
 
-    out_dir = config.data_dir / "processed"
+    out_dir = Path(config.data_dir) / "processed"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     csv_path = config.data_dir / "train_2.csv" \
