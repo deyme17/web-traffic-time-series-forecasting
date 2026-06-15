@@ -56,6 +56,7 @@ def predict_checkpoint(checkpoint: Path,
         enc_in_size=loader.dataset.enc_dim,
         dec_in_size=loader.dataset.dec_dim,
         horizon=loader.dataset.horizon,
+        lookback=loader.dataset.lookback,
     ).to(device)
     model, state_dict = load_checkpoint(
         checkpoint,
