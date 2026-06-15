@@ -147,8 +147,15 @@ The attention is computed **once** before the decoder loop (not re-queried each 
 **Loop** (`train.py`): standard PyTorch with tqdm, gradient clipping, EMA weights, early stopping, and checkpoint saving on validation improvement.
 
 **Data split strategy:**
-- `train` — random window start each sample (data augmentation via random offsets)
-- `valid` — fixed window at `n_days - lookback - horizon - back_offset`
+
+The pipeline supports two modes depending on whether validation is used (controlled via the `--use-valid` flag):
+
+* **Final Training Mode (No Validation):** Used for production runs to train the final model with maximum data before making competition predictions.
+  * **`train`** — Random window start that can use the entire available time range up to the last available day (`back_offset=0`). This maximizes data augmentation via random offsets.
+  * **`valid`** — Disabled (`None`).
+* **Experimentation Mode (With Validation):** Used exclusively for hyperparameter tuning and model architecture evaluation.
+  * **`train`** — Random window start, but constrained to leave a `back_offset` (equal to the forecasting `horizon`) at the very end of the time series to prevent data leakage into the validation set.
+  * **`valid`** — A single fixed window at the very end of the dataset: `n_days - lookback - horizon - back_offset`.
 
 **EMA**: `torch_ema.ExponentialMovingAverage` with `decay=0.999` — averaged weights used at inference and checkpoint saving.
 
