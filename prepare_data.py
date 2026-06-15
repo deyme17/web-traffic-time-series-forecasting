@@ -118,14 +118,19 @@ def interpolate_gaps(data: np.ndarray, max_gap_interpolate: int) -> np.ndarray:
 
 def drop_dead_pages(data: np.ndarray,
                     pages: List[str],
-                    horizon: int,
+                    check_window: int = 180,
                     ) -> Tuple[np.ndarray, List[str], np.ndarray]:
     """
-    Drops pages where: all zeros in the last `horizon` days (dead page)
-    Returns (filtered_data, filtered_pages, keep_mask).
+    Drops pages that are truly dead:
+    - never had any traffic (all NaN or zero across entire series), OR
+    - no traffic in last `check_window` days
     """
-    keep_mask = ~np.all(np.isnan(data[:, -horizon:]) | (data[:, -horizon:] == 0), axis=1)
-    print(f"\tdropped {(~keep_mask).sum()} dead pages). kept {keep_mask.sum()}.")
+    never_alive = np.all(np.isnan(data) | (data == 0), axis=1)
+    window = data[:, -check_window:]
+    dead_recently = np.all(np.isnan(window) | (window == 0), axis=1)
+    keep_mask = ~(never_alive | dead_recently)
+    print(f"\tnever alive: {never_alive.sum()}, dead in last {check_window}d: {(dead_recently & ~never_alive).sum()}")
+    print(f"\tdropped {(~keep_mask).sum()} pages, kept {keep_mask.sum()}")
     return data[keep_mask], [p for p, k in zip(pages, keep_mask) if k], keep_mask
 
 
@@ -259,7 +264,7 @@ def main() -> None:
     pages, raw = read_csv(csv_path)
 
     # dead pages
-    raw, pages, _ = drop_dead_pages(raw, pages, config.horizon)
+    raw, pages, _ = drop_dead_pages(raw, pages)
 
     # anomalies
     print("Winsorizing...")
