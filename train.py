@@ -13,8 +13,8 @@ from contextlib import nullcontext
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
 from utils import (Config,
-    save_checkpoint, load_checkpoint, 
-    set_seed, visualize_training
+    save_checkpoint, load_checkpoint, set_seed, 
+    visualize_training, denormalize_tensor
 )
 
 from models import get_model
@@ -65,10 +65,15 @@ def train_rnn(model: nn.Module,
             dec_in = X["dec_input"].to(device)
             target = X["target"].to(device)
             target_mask = X["target_mask"].to(device)
+            mean = X["series_mean"].to(device)
+            std = X["series_std"].to(device)
 
             optimizer.zero_grad(set_to_none=True)
             
             out = model(enc_in, dec_in)
+
+            out = denormalize_tensor(out, mean, std)
+            target = denormalize_tensor(out, mean, std)
             loss = criterion(out, target, target_mask)
 
             loss.backward()
@@ -98,8 +103,13 @@ def train_rnn(model: nn.Module,
                     dec_in = X["dec_input"].to(device)
                     target = X["target"].to(device)
                     target_mask = X["target_mask"].to(device)
+                    mean = X["series_mean"].to(device)
+                    std = X["series_std"].to(device)
 
                     out = model(enc_in, dec_in)
+                    
+                    out = denormalize_tensor(out, mean, std)
+                    target = denormalize_tensor(out, mean, std)
                     loss = criterion(out, target, target_mask)
 
                     val_loss += loss.item()

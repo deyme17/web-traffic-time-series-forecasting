@@ -133,3 +133,10 @@ def normalize(arr: np.ndarray) -> np.ndarray:
         std[std == 0] = 1.
 
     return ((arr - mu) / std).astype(np.float32)
+
+
+
+def denormalize_tensor(input: torch.Tensor,
+                       mean: torch.Tensor,
+                       std: torch.Tensor) -> torch.Tensor:
+    return input * std + mean
