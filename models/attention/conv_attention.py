@@ -7,7 +7,8 @@ from utils.constants import FINGERPRINT_SIGNAL
 
 class ConvFingerprint(nn.Module):
     """CNN that produces a 'fingerprint' of the input timeseries."""
-    def __init__(self, in_ch: int = 1, out_size: int = 16, lookback: int = 365):
+    def __init__(self, in_ch: int = 1, out_size: int = 16, 
+                 lookback: int = 365, dropout: bool = 0.):
         super().__init__()
         self.convnet = nn.Sequential(
             nn.Conv1d(in_ch, 16, kernel_size=7, padding=3), nn.ReLU(),
@@ -21,6 +22,7 @@ class ConvFingerprint(nn.Module):
             nn.MaxPool1d(2),
         )
         self.fc = nn.Sequential(
+            nn.Dropout(dropout),
             nn.Linear(64 * (lookback // 8), 512), nn.SELU(),
             nn.Linear(512, out_size), nn.SELU(),
         )
@@ -42,7 +44,9 @@ class ConvAttention(nn.Module):
                  attn_window: int,
                  horizon: int,
                  lookback: int,
-                 n_heads: int = 4):
+                 n_heads: int = 4,
+                 readout_dropout: bool = 0.,
+                 fingerprint_dropout: bool = 0.):
         """
         Args:
             enc_h_size: Encoder hidden size.
@@ -52,6 +56,8 @@ class ConvAttention(nn.Module):
             horizon: Prediction window.
             lookback: Past timestep size.
             n_heads: Number of attention heads.
+            readout_dropout: Dropout before readout_proj.
+            fingerprint_dropout: Dropout before ConvFingerprint.fc
         """
         super().__init__()
         self.n_heads = n_heads
@@ -63,8 +69,10 @@ class ConvAttention(nn.Module):
 
         self.fingerprint = ConvFingerprint(self.n_signal, 
                                            fingerprint_size,
-                                           lookback)
+                                           lookback,
+                                           fingerprint_dropout)
         self.readout_proj = nn.Sequential(
+            nn.Dropout(readout_dropout),
             nn.Linear(enc_h_size, readout_size),
             nn.SELU(),
         )

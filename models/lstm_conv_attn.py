@@ -14,11 +14,13 @@ class ConvAttnLSTM(nn.Module):
                  n_layers: int = 1,
                  horizon: int = 62,
                  lookback: int = 365,
-                 dropout: float = 0.,
-                 dropout_ctx: float = 0.,
                  readout_size: int = 128,
                  fingerprint_size: int = 16,
                  attn_n_heads: int = 4,
+                 dropout: float = 0.,
+                 dropout_ctx: float = 0.,
+                 readout_dropout: bool = 0.,
+                 fingerprint_dropout: bool = 0.,
                  **kwargs) -> None:
         """
         Args:
@@ -27,11 +29,13 @@ class ConvAttnLSTM(nn.Module):
             n_layers: Number of stacked layers in encoder and decoder LSTM.
             horizon: Number of future timesteps to predict.
             lookback: Number of past timesteps for attention window.
-            dropout: Dropout probability applied after each decoder layer output.
-            dropout_ctx: Dropout on encoder hidden state passed to decoder init.
             readout_size: Compressed readout depth in ConvAttention.
             fingerprint_size: CNN output size for ConvFingerprint.
             attn_n_heads: Number of attention heads in ConvAttention.
+            dropout: Dropout probability applied after each decoder layer output.
+            dropout_ctx: Dropout on encoder hidden state passed to decoder init.
+            readout_dropout: Dropout before readout projection in ConvAttention.
+            fingerprint_dropout: Dropout before ConvFingerprint fully connected layer.
         """
         super().__init__()
         self.enc_in_size = enc_in_size
@@ -72,7 +76,9 @@ class ConvAttnLSTM(nn.Module):
             attn_window=self.attn_window,
             horizon=horizon,
             lookback=lookback,
-            n_heads=attn_n_heads
+            n_heads=attn_n_heads,
+            readout_dropout=readout_dropout,
+            fingerprint_dropout=fingerprint_dropout,
         )
         attn_out_size = readout_size * attn_n_heads
 
