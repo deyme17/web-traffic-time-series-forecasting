@@ -18,10 +18,10 @@ class Config:
     checkpoints_dir: Path = Path("checkpoints").resolve()
 
     # data
-    max_gap_interpolate: int = 7    # if gaps <= max_gap_interpolate -> linear interpolation
+    max_gap_interpolate: int = 14   # if gaps <= max_gap_interpolate -> linear interpolation
     winsor_k: float = 4.            # spike threshold: median +- winsor_k * MAD
 
-    lookback: int = 365
+    lookback: int = 500
     horizon: int = 62
     add_days: int = 63
     first_date: str = "2015-07-01"
@@ -46,6 +46,9 @@ class Config:
     max_norm: float|None = None
     patience: int|None = None
     ema_decay: float|None = None
+
+    temporal_smoothness_penalty: bool = 0.
+    state_energy_penalty: bool = 0.
 
     # registries
     model: RegistryConfig = field(default_factory=RegistryConfig)
