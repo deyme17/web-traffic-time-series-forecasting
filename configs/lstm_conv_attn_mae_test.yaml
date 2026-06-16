@@ -1,5 +1,5 @@
 # interval
-lookback: 365
+lookback: 500
 horizon: 62
 
 # dataloader
@@ -9,8 +9,8 @@ test_batch: 256
 n_workers: 4
 
 # training
-seed: 228
-epochs: 21
+seed: 123
+epochs: 30
 warmup_epochs: 18
 max_norm: 2
 patience: 10
@@ -47,9 +47,9 @@ loss:
 optimizer: 
     name: "AdamW"
     parameters:
-        lr:  0.0007
+        lr:  0.0008
         betas: [0.9, 0.999]
-        weight_decay: 0.0001
+        weight_decay: 0.0008
         amsgrad: False
 
 
