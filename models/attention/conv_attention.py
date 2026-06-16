@@ -8,7 +8,7 @@ from utils.constants import FINGERPRINT_SIGNAL
 class ConvFingerprint(nn.Module):
     """CNN that produces a 'fingerprint' of the input timeseries."""
     def __init__(self, in_ch: int = 1, out_size: int = 16, 
-                 lookback: int = 365, dropout: bool = 0.):
+                 lookback: int = 365, dropout: float = 0.):
         super().__init__()
         self.convnet = nn.Sequential(
             nn.Conv1d(in_ch, 16, kernel_size=7, padding=3), nn.ReLU(),
@@ -45,8 +45,8 @@ class ConvAttention(nn.Module):
                  horizon: int,
                  lookback: int,
                  n_heads: int = 4,
-                 readout_dropout: bool = 0.,
-                 fingerprint_dropout: bool = 0.):
+                 readout_dropout: float = 0.,
+                 fingerprint_dropout: float = 0.):
         """
         Args:
             enc_h_size: Encoder hidden size.
@@ -84,6 +84,7 @@ class ConvAttention(nn.Module):
 
         fprint = self.fingerprint(enc_input[:, :, :self.n_signal])              # enc_in_size -> fingerprint_size
         scores = self.focus(fprint).view(B, self.attn_window, self.n_heads)     # attn_window, n_heads
+        scores = F.relu(scores)                                                 # scores >= 0
         weights = scores / (scores.sum(dim=1, keepdim=True) + 1e-8)             # normalize
 
         readout = self.readout_proj(enc_states)                                 # enc_h_size -> readout_size
