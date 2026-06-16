@@ -14,7 +14,8 @@ from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
 from utils import (Config,
     save_checkpoint, load_checkpoint, set_seed, 
-    visualize_training, denormalize_tensor
+    visualize_training, denormalize_tensor,
+    temporal_smoothness_penalty, state_energy_penalty
 )
 
 from models import get_model
@@ -73,8 +74,20 @@ def train_rnn(model: nn.Module,
             out = model(enc_in, dec_in)
 
             out = denormalize_tensor(out, mean, std)
-            target = denormalize_tensor(out, mean, std)
+            target = denormalize_tensor(target, mean, std)
             loss = criterion(out, target, target_mask)
+
+            # regularization
+            if hasattr(model, "h_states") and model.h_states is not None:
+                if config.tsp_h > 0:
+                    loss += config.tsp_h * temporal_smoothness_penalty(model.h_states)
+                if config.sep_h > 0:
+                    loss += config.sep_h * state_energy_penalty(model.h_states)
+            if hasattr(model, "c_states") and model.c_states is not None:
+                if config.tsp_c > 0:
+                    loss += config.tsp_c * temporal_smoothness_penalty(model.c_states)
+                if config.sep_c > 0:
+                    loss += config.sep_c * state_energy_penalty(model.c_states)
 
             loss.backward()
 
@@ -107,9 +120,9 @@ def train_rnn(model: nn.Module,
                     std = X["series_std"].to(device)
 
                     out = model(enc_in, dec_in)
-                    
+
                     out = denormalize_tensor(out, mean, std)
-                    target = denormalize_tensor(out, mean, std)
+                    target = denormalize_tensor(target, mean, std)
                     loss = criterion(out, target, target_mask)
 
                     val_loss += loss.item()
