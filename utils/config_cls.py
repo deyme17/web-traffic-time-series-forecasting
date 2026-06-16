@@ -47,8 +47,8 @@ class Config:
     patience: int|None = None
     ema_decay: float|None = None
 
-    temporal_smoothness_penalty: bool = 0.
-    state_energy_penalty: bool = 0.
+    temporal_smoothness_penalty: float = 0.
+    state_energy_penalty: float = 0.
 
     # registries
     model: RegistryConfig = field(default_factory=RegistryConfig)
