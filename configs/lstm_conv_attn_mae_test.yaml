@@ -18,6 +18,8 @@ ema_decay: 0.999
 
 tsp_h: 0.000001
 sep_h: 0.000001
+tsp_c: 0.00000001
+sep_c: 0.00000001
 
 # registries
 model: 
