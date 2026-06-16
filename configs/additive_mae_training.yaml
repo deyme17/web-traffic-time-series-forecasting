@@ -15,6 +15,11 @@ warmup_epochs: 10
 max_norm: 1
 patience: 12
 
+tsp_h: 1e-6
+tsp_c: 1e-8
+sep_h: 1e-6
+sep_c: 1e-8
+
 # registries
 model: 
     name: "LSTM"

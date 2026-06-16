@@ -16,6 +16,9 @@ max_norm: 2
 patience: 10
 ema_decay: 0.999
 
+tsp_h: 1e-6
+sep_h: 1e-6
+
 # registries
 model: 
     name: "LSTM_ConvAttn"
@@ -23,11 +26,18 @@ model:
         enc_h_size: 256
         dec_h_size: 256
         n_layers: 1
-        dropout: 0.1
-        dropout_ctx: 0.1
         readout_size: 128
         fingerprint_size: 16
         attn_n_heads: 4
+        dropout_enc: 0.
+        dropout_dec: 0.
+        dropout_in: 0.
+        dropout_h: 0.
+        dropout_c: 0.
+        dropout_out: 0.
+        dropout_ctx: 0.
+        readout_dropout: 0.
+        fingerprint_dropout: 0.
 
 
 loss: 
