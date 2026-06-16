@@ -9,8 +9,8 @@ test_batch: 256
 n_workers: 4
 
 # training
-seed: 321
-epochs: 27
+seed: 766
+epochs: 20
 warmup_epochs: 7
 max_norm: 2
 patience: null
@@ -56,5 +56,5 @@ optimizer:
 scheduler: 
     name: "CosineAnnealingLR"
     parameters:
-        T_max: 27
+        T_max: 20
         eta_min: 0.0001
