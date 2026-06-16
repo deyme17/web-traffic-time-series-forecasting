@@ -21,9 +21,13 @@ model:
         enc_h_size: 256
         dec_h_size: 256
         n_layers: 1
-        dropout: 0.
-        dropout_ctx: 0.
         attn_type: "none"
+        dropout_enc: 0.2
+        dropout_dec: 0.0
+        dropout_ctx: 0.5
+        dropout_h: 0.005
+        dropout_c: 0.005
+        dropout_out: 0.3
 
 
 loss: 

@@ -29,15 +29,14 @@ model:
         readout_size: 128
         fingerprint_size: 16
         attn_n_heads: 4
-        dropout_enc: 0.
-        dropout_dec: 0.
-        dropout_in: 0.
-        dropout_h: 0.
-        dropout_c: 0.
-        dropout_out: 0.
-        dropout_ctx: 0.
-        readout_dropout: 0.
-        fingerprint_dropout: 0.
+        dropout_enc: 0.2
+        dropout_dec: 0.0
+        dropout_ctx: 0.5
+        dropout_h: 0.005
+        dropout_c: 0.005
+        dropout_out: 0.3
+        readout_dropout: 0.3
+        fingerprint_dropout: 0.35
 
 
 loss: 
