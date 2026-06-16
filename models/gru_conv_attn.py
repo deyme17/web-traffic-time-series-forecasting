@@ -18,6 +18,7 @@ class ConvAttnGRU(nn.Module):
                  fingerprint_size: int = 16,
                  attn_n_heads: int = 4,
                  dropout_enc: float = 0.,
+                 dropout_dec: float = 0.,
                  dropout_in: float = 0.,
                  dropout_h: float = 0.,
                  dropout_out: float = 0.,
@@ -36,9 +37,10 @@ class ConvAttnGRU(nn.Module):
             fingerprint_size: CNN output size for ConvFingerprint.
             attn_n_heads: Number of attention heads in ConvAttention.
             dropout_enc: Dropout probability applied after each encoder layer.
-            dropout_in: Dropout probability applied after decoder input layer.
-            dropout_h: Dropout probability applied after each decoder hidden layer.
-            dropout_out: Dropout probability applied after each decoder output layer.
+            dropout_dec: Dropout probability applied after each decoder layer.
+            dropout_in: Dropout probability applied before decoder input layer.
+            dropout_h: Dropout probability applied to decoder hidden state.
+            dropout_out: Dropout probability applied before each decoder output layer.
             dropout_ctx: Dropout on encoder hidden state passed to decoder init.
             readout_dropout: Dropout before readout projection in ConvAttention.
             fingerprint_dropout: Dropout before ConvFingerprint fully connected layer.
@@ -87,18 +89,20 @@ class ConvAttnGRU(nn.Module):
 
         # decoder
         self.dropout_in = nn.Dropout(dropout_in)
+        self.dropout_dec = nn.Dropout(dropout_dec)
+        self.dropout_h = nn.Dropout(dropout_h)
+        self.dropout_out = nn.Dropout(dropout_out)
+
         self.decoder_in = nn.GRUCell(
             1 + dec_in_size + attn_out_size,
             dec_h_size
         )
-        self.dropout_h = nn.Dropout(dropout_h)
         self.decoder = nn.ModuleList([
             nn.GRUCell(dec_h_size, dec_h_size)
             for _ in range(n_layers - 1)
         ])
 
         # out
-        self.dropout_out = nn.Dropout(dropout_out)
         self.out_proj = nn.Linear(dec_h_size, 1)
 
     def _init_decoder_state(self, h_n: torch.Tensor) -> list[torch.Tensor]:
@@ -126,12 +130,12 @@ class ConvAttnGRU(nn.Module):
         for t in range(self.horizon):
             x = torch.cat([prev_pred, dec_in[:, t, :], attn[:, t, :]], dim=-1)
             x = self.dropout_in(x)
-            h[0] = self.decoder_in(x, h[0])
+            h[0] = self.decoder_in(x, self.dropout_h(h[0]))
             out = h[0]
 
             for i, dec_cell in enumerate(self.decoder):
-                out = self.dropout_h(out)
-                h[i + 1] = dec_cell(out, h[i + 1])
+                out = self.dropout_dec(out)
+                h[i + 1] = dec_cell(out, self.dropout_h(h[i+1]))
                 out = h[i + 1]
 
             pred = self.out_proj(self.dropout_out(out))
