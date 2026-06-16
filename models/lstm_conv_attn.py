@@ -60,6 +60,9 @@ class ConvAttnLSTM(nn.Module):
         self.fingerprint_size = fingerprint_size
         self.attn_n_heads = attn_n_heads
 
+        self.h_states: torch.Tensor|None = None
+        self.c_states: torch.Tensor|None = None
+
         # encoder
         self.encoder = nn.LSTM(
             input_size=enc_in_size,
@@ -135,6 +138,7 @@ class ConvAttnLSTM(nn.Module):
         # decoder
         h, c = self._init_decoder_state(h_n, c_n)
 
+        dec_h_states, dec_c_states = [], []
         preds = []
         prev_pred = torch.zeros(enc_in.size(0), 1, device=enc_in.device)
 
@@ -151,8 +155,14 @@ class ConvAttnLSTM(nn.Module):
                                                     self.dropout_c(c[i + 1])))
                 out = h[i + 1]
 
+            dec_h_states.append(h[-1].unsqueeze(1))
+            dec_c_states.append(c[-1].unsqueeze(1))
+
             pred = self.out_proj(self.dropout_out(out))
             preds.append(pred)
             prev_pred = pred
+
+        self.h_states = torch.cat(dec_h_states, dim=1)
+        self.c_states = torch.cat(dec_c_states, dim=1)
 
         return torch.cat(preds, dim=-1)

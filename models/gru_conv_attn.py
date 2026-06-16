@@ -58,6 +58,8 @@ class ConvAttnGRU(nn.Module):
         self.fingerprint_size = fingerprint_size
         self.attn_n_heads = attn_n_heads
 
+        self.h_states: torch.Tensor|None = None
+
         # encoder
         self.encoder = nn.GRU(
             input_size=enc_in_size,
@@ -124,6 +126,7 @@ class ConvAttnGRU(nn.Module):
         # decoder
         h = self._init_decoder_state(h_n)
 
+        dec_h_states = []
         preds = []
         prev_pred = torch.zeros(enc_in.size(0), 1, device=enc_in.device)
 
@@ -138,8 +141,12 @@ class ConvAttnGRU(nn.Module):
                 h[i + 1] = dec_cell(out, self.dropout_h(h[i+1]))
                 out = h[i + 1]
 
+            dec_h_states.append(out.unsqueeze(1))
+
             pred = self.out_proj(self.dropout_out(out))
             preds.append(pred)
             prev_pred = pred
+
+        self.h_states = torch.cat(dec_h_states, dim=1)
 
         return torch.cat(preds, dim=-1)

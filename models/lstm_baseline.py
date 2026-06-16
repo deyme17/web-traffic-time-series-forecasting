@@ -43,6 +43,9 @@ class BaselineLSTM(nn.Module):
         self.attn_size = attn_size
         self.attn_n_heads = attn_n_heads
 
+        self.h_states: torch.Tensor|None = None
+        self.c_states: torch.Tensor|None = None
+
         # encoder
         self.encoder = nn.LSTM(
             input_size=enc_in_size,
@@ -93,6 +96,7 @@ class BaselineLSTM(nn.Module):
         c = [c_n[i] for i in range(self.n_layers)]
         
         # decoder
+        dec_h_states, dec_c_states = [], []
         preds = []
         prev_pred = torch.zeros(enc_in.shape[0], 1, device=enc_in.device)
 
@@ -115,8 +119,14 @@ class BaselineLSTM(nn.Module):
                 h[i + 1], c[i + 1] = dec_cell(out, (h[i + 1], c[i + 1]))
                 out = h[i + 1]
 
+            dec_h_states.append(h[-1])
+            dec_c_states.append(c[-1])
+
             pred = self.out_proj(self.dropout(out))
             preds.append(pred)
             prev_pred = pred
+
+        self.h_states = torch.stack(dec_h_states, dim=1)
+        self.c_states = torch.stack(dec_c_states, dim=1)
 
         return torch.cat(preds, dim=-1)
