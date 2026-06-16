@@ -16,8 +16,8 @@ max_norm: 2
 patience: 10
 ema_decay: 0.999
 
-tsp_h: 1e-6
-sep_h: 1e-6
+tsp_h: 0.000001
+sep_h: 0.000001
 
 # registries
 model: 

@@ -15,10 +15,10 @@ warmup_epochs: 15
 max_norm: 2
 patience: 10
 
-tsp_h: 1e-6
-tsp_c: 1e-8
-sep_h: 1e-6
-sep_c: 1e-8
+tsp_h: 0.000001
+sep_h: 0.000001
+tsp_c: 0.00000001
+sep_c: 0.00000001
 
 # registries
 model: 
