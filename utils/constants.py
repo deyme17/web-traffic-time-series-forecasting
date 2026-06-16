@@ -3,7 +3,7 @@ import re
 
 # === data processing constants ===
 
-LAG_DAYS = [7, 31, 180, 365]
+LAG_DAYS = [7, 31, 91, 180, 365]
 
 ACCESS = ["spider", "desktop", "mobile-web", "all-access"]
 AGENTS = ["spider", "all-agents"]
