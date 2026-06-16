@@ -66,8 +66,8 @@ def train_rnn(model: nn.Module,
             dec_in = X["dec_input"].to(device)
             target = X["target"].to(device)
             target_mask = X["target_mask"].to(device)
-            mean = X["series_mean"].to(device)
-            std = X["series_std"].to(device)
+            mean = X["series_mean"].to(device).unsqueeze(-1)
+            std = X["series_std"].to(device).unsqueeze(-1)
 
             optimizer.zero_grad(set_to_none=True)
             
@@ -116,8 +116,8 @@ def train_rnn(model: nn.Module,
                     dec_in = X["dec_input"].to(device)
                     target = X["target"].to(device)
                     target_mask = X["target_mask"].to(device)
-                    mean = X["series_mean"].to(device)
-                    std = X["series_std"].to(device)
+                    mean = X["series_mean"].to(device).unsqueeze(-1)
+                    std = X["series_std"].to(device).unsqueeze(-1)
 
                     out = model(enc_in, dec_in)
 
