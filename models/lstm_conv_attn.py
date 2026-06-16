@@ -20,7 +20,6 @@ class ConvAttnLSTM(nn.Module):
                  dropout_enc: float = 0.,
                  dropout_dec: float = 0.,
                  dropout_ctx: float = 0.,
-                 dropout_in: float = 0.,
                  dropout_h: float = 0.,
                  dropout_c: float = 0.,
                  dropout_out: float = 0.,
@@ -40,7 +39,6 @@ class ConvAttnLSTM(nn.Module):
             dropout_enc: Dropout probability applied after each encoder layer.
             dropout_dec: Dropout probability applied after each decoder layer.
             dropout_ctx: Dropout on encoder hidden state passed to decoder init.
-            dropout_in: Dropout probability applied before decoder input layer.
             dropout_h: Dropout probability applied to decoder hidden state.
             dropout_c: Dropout probability applied to decoder c state.
             dropout_out: Dropout probability applied before each decoder output layer.
@@ -96,7 +94,6 @@ class ConvAttnLSTM(nn.Module):
         attn_out_size = readout_size * attn_n_heads
 
         # decoder
-        self.dropout_in = nn.Dropout(dropout_in)
         self.dropout_dec = nn.Dropout(dropout_dec)
         self.dropout_h = nn.Dropout(dropout_h)
         self.dropout_c = nn.Dropout(dropout_c)
@@ -144,7 +141,6 @@ class ConvAttnLSTM(nn.Module):
 
         for t in range(self.horizon):
             x = torch.cat([prev_pred, dec_in[:, t, :], attn[:, t, :]], dim=-1)
-            x = self.dropout_in(x)
             h[0], c[0] = self.decoder_in(x, (self.dropout_h(h[0]), 
                                              self.dropout_c(c[0])))
             out = h[0]
