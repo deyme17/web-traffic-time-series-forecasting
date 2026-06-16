@@ -21,8 +21,8 @@ class ConvFingerprint(nn.Module):
             nn.MaxPool1d(2),
         )
         self.fc = nn.Sequential(
-            nn.Linear(64 * (lookback // 8), 512), nn.SiLU(),
-            nn.Linear(512, out_size), nn.SiLU(),
+            nn.Linear(64 * (lookback // 8), 512), nn.SELU(),
+            nn.Linear(512, out_size), nn.SELU(),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -66,7 +66,7 @@ class ConvAttention(nn.Module):
                                            lookback)
         self.readout_proj = nn.Sequential(
             nn.Linear(enc_h_size, readout_size),
-            nn.SiLU(),
+            nn.SELU(),
         )
         self.focus = nn.Linear(fingerprint_size, attn_window * n_heads)
 
@@ -76,7 +76,7 @@ class ConvAttention(nn.Module):
 
         fprint = self.fingerprint(enc_input[:, :, :self.n_signal])              # enc_in_size -> fingerprint_size
         scores = self.focus(fprint).view(B, self.attn_window, self.n_heads)     # attn_window, n_heads
-        weights = F.softmax(scores, dim=1)                                      # normalize
+        weights = scores / (scores.sum(dim=1, keepdim=True) + 1e-8)             # normalize
 
         readout = self.readout_proj(enc_states)                                 # enc_h_size -> readout_size
         readout = readout.permute(0, 2, 1)                                      # lookback, <-> readout_size
