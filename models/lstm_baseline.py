@@ -13,11 +13,16 @@ class BaselineLSTM(nn.Module):
                  dec_h_size: int = 256, 
                  n_layers: int = 1, 
                  horizon: int = 365, 
-                 dropout: float = 0., 
-                 dropout_ctx: float = 0.,
                  attn_type: str = "none",
                  attn_size: int = 128,
                  attn_n_heads: int = 4,
+                 dropout_enc: float = 0.,
+                 dropout_dec: float = 0.,
+                 dropout_ctx: float = 0.,
+                 dropout_in: float = 0.,
+                 dropout_h: float = 0.,
+                 dropout_c: float = 0.,
+                 dropout_out: float = 0.,
                  **kwargs) -> None:
         """
         Args:
@@ -25,11 +30,16 @@ class BaselineLSTM(nn.Module):
             enc/dec_h_size: Hidden state size of encoder/decoder.
             n_layers: Number of stacked layers in the encoder and decoder LSTM.
             horizon: Number of future timesteps to predict.
-            dropout: Dropout probability applied after each decoder layer output.
-            dropout_ctx: Dropout for encoder's output (context) that goes to the decoder.
             attn_type: Type of attention mechanism to use ('none' | 'additive' | 'dot' | 'multihead').
             attn_size: Projection size inside the attention module.
             attn_n_heads: Number of heads (for multihead attention only).
+            dropout_enc: Dropout probability applied after each encoder layer.
+            dropout_dec: Dropout probability applied after each decoder layer.
+            dropout_ctx: Dropout for encoder's output that goes to the decoder.
+            dropout_in: Dropout probability applied before decoder input layer.
+            dropout_h: Dropout probability applied to decoder hidden state.
+            dropout_c: Dropout probability applied to decoder c state.
+            dropout_out: Dropout probability applied before each decoder output layer.
         """
         super().__init__()
         assert attn_type in ("none", "additive", "dot", "multihead")
@@ -52,7 +62,7 @@ class BaselineLSTM(nn.Module):
             hidden_size=enc_h_size,
             num_layers=n_layers,
             batch_first=True,
-            dropout=dropout if n_layers > 1 else 0.,
+            dropout=dropout_enc if n_layers > 1 else 0.,
         )
         self.dropout_ctx = nn.Dropout(dropout_ctx)
         
@@ -71,6 +81,12 @@ class BaselineLSTM(nn.Module):
             context_size = enc_h_size + enc_h_size * 2  # attention + enc_context
 
         # decoder
+        self.dropout_in = nn.Dropout(dropout_in)
+        self.dropout_dec = nn.Dropout(dropout_dec)
+        self.dropout_h = nn.Dropout(dropout_h)
+        self.dropout_c = nn.Dropout(dropout_c)
+        self.dropout_out = nn.Dropout(dropout_out)
+
         self.decoder_in = nn.LSTMCell(
             dec_in_size + context_size + 1, 
             dec_h_size
@@ -81,7 +97,6 @@ class BaselineLSTM(nn.Module):
         ])
 
         # out
-        self.dropout = nn.Dropout(dropout)
         self.out_proj = nn.Linear(dec_h_size, 1)
 
     def forward(self, enc_in: torch.Tensor, dec_in: torch.Tensor) -> torch.Tensor:
@@ -112,17 +127,21 @@ class BaselineLSTM(nn.Module):
                 context = enc_context
 
             x = torch.cat([prev_pred, dec_in[:, t, :], context], dim=-1)
-            h[0], c[0] = self.decoder_in(x, (h[0], c[0]))
+            x = self.dropout_in(x)
+            h[0], c[0] = self.decoder_in(x, (self.dropout_h(h[0]), 
+                                             self.dropout_c(c[0])))
             out = h[0]
 
             for i, dec_cell in enumerate(self.decoder):
-                h[i + 1], c[i + 1] = dec_cell(out, (h[i + 1], c[i + 1]))
+                out = self.dropout_dec(out)
+                h[i + 1], c[i + 1] = dec_cell(out, (self.dropout_h(h[i + 1]), 
+                                                    self.dropout_c(c[i + 1])))
                 out = h[i + 1]
 
             dec_h_states.append(h[-1])
             dec_c_states.append(c[-1])
 
-            pred = self.out_proj(self.dropout(out))
+            pred = self.out_proj(self.dropout_out(out))
             preds.append(pred)
             prev_pred = pred
 

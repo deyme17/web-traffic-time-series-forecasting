@@ -19,10 +19,10 @@ class ConvAttnGRU(nn.Module):
                  attn_n_heads: int = 4,
                  dropout_enc: float = 0.,
                  dropout_dec: float = 0.,
+                 dropout_ctx: float = 0.,
                  dropout_in: float = 0.,
                  dropout_h: float = 0.,
                  dropout_out: float = 0.,
-                 dropout_ctx: float = 0.,
                  readout_dropout: float = 0.,
                  fingerprint_dropout: float = 0.,
                  **kwargs) -> None:
@@ -38,10 +38,10 @@ class ConvAttnGRU(nn.Module):
             attn_n_heads: Number of attention heads in ConvAttention.
             dropout_enc: Dropout probability applied after each encoder layer.
             dropout_dec: Dropout probability applied after each decoder layer.
+            dropout_ctx: Dropout on encoder hidden state passed to decoder init.
             dropout_in: Dropout probability applied before decoder input layer.
             dropout_h: Dropout probability applied to decoder hidden state.
             dropout_out: Dropout probability applied before each decoder output layer.
-            dropout_ctx: Dropout on encoder hidden state passed to decoder init.
             readout_dropout: Dropout before readout projection in ConvAttention.
             fingerprint_dropout: Dropout before ConvFingerprint fully connected layer.
         """
