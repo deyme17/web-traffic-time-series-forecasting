@@ -145,7 +145,7 @@ def train_rnn(model: nn.Module,
         print(f"[Epoch: {epoch + 1}] Train Loss: {train_loss:.3f} | Val Loss: {val_str} | lr: {lr}")
         
         # checkpoint
-        if val_loss < best_val_loss:
+        if val_loss < best_val_loss or valid_loader is None:
             if epoch >= config.warmup_epochs:
                 with ema.average_parameters() if ema is not None else nullcontext():
                     save_checkpoint(
