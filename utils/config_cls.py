@@ -22,7 +22,7 @@ class Config:
     winsor_k: float|None = None            # spike threshold: median +- winsor_k * MAD
     remove_dead_pages: bool = False
 
-    lookback: int = 500
+    lookback: int = 365
     horizon: int = 62
     add_days: int = 63
     first_date: str = "2015-07-01"

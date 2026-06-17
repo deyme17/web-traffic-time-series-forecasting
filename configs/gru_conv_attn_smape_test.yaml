@@ -1,5 +1,5 @@
 # interval
-lookback: 500
+lookback: 365
 horizon: 62
 
 # dataloader
