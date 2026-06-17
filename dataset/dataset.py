@@ -20,7 +20,8 @@ class WTTSF_Dataset(Dataset):
                  split: str = "train",
                  back_offset: int = 0, 
                  transforms= None, 
-                 seed: Optional[int] = None):
+                 seed: Optional[int] = None,
+                 max_zero_ratio: Optional[float] = None):
         """    
         Args:
             data_root: directory that contains the processed data.
@@ -33,6 +34,7 @@ class WTTSF_Dataset(Dataset):
             back_offset: days to leave at the end of training window for validation
             transforms: optional callable applied to the output dict.
             seed: random seed for reproducibility.
+            max_zero_ratio: Exclude pages where the fraction of zeros in the series > threshold.
         """
         super().__init__()
         assert split in ("train", "valid", "predict")
@@ -74,6 +76,14 @@ class WTTSF_Dataset(Dataset):
             pm["cat_site"],
         ], axis=1).astype(np.float32)
 
+        # filter zeros
+        if max_zero_ratio is not None:
+            zero_ratios = (self._hits == 0).mean(axis=1)
+            valid_mask = zero_ratios <= max_zero_ratio
+            self._page_index = np.where(valid_mask)[0].astype(np.int32)
+        else:
+            self._page_index = np.arange(self.n_pages, dtype=np.int32)
+
         # min valid start for train
         self._min_start = 0 # max(meta.get("lag_days", [365])) # <- believe to _nan_mask
 
@@ -100,9 +110,10 @@ class WTTSF_Dataset(Dataset):
         return DEC_DIM
 
     def __len__(self) -> int:
-        return self.n_pages
+        return len(self._page_index)
 
     def __getitem__(self, idx: int) -> dict:
+        idx = int(self._page_index[idx])
         n_window = self.lookback + self.horizon
         if self.split == "train":
             lo = self._min_start

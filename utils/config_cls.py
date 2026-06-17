@@ -21,6 +21,7 @@ class Config:
     max_gap_interpolate: int|None = None   # if gaps <= max_gap_interpolate -> linear interpolation
     winsor_k: float|None = None            # spike threshold: median +- winsor_k * MAD
     remove_dead_pages: bool = False
+    max_zero_ratio: float = 0.3
 
     lookback: int = 365
     horizon: int = 62
