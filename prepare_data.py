@@ -264,15 +264,18 @@ def main() -> None:
     pages, raw = read_csv(csv_path)
 
     # dead pages
-    raw, pages, _ = drop_dead_pages(raw, pages)
+    if config.remove_dead_pages:
+        raw, pages, _ = drop_dead_pages(raw, pages)
 
     # anomalies
-    print("Winsorizing...")
-    raw = winsorize(raw, config.winsor_k)
+    if config.winsor_k is not None:
+        print("Winsorizing...")
+        raw = winsorize(raw, config.winsor_k)
 
     # handle missings
-    print("Interpolating gaps...")
-    raw = interpolate_gaps(raw, config.max_gap_interpolate)
+    if config.max_gap_interpolate is not None:
+        print("Interpolating gaps...")
+        raw = interpolate_gaps(raw, config.max_gap_interpolate)
     nan_mask = np.isnan(raw)
 
     # log1p

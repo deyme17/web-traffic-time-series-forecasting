@@ -18,8 +18,9 @@ class Config:
     checkpoints_dir: Path = Path("checkpoints").resolve()
 
     # data
-    max_gap_interpolate: int = 14   # if gaps <= max_gap_interpolate -> linear interpolation
-    winsor_k: float = 4.            # spike threshold: median +- winsor_k * MAD
+    max_gap_interpolate: int|None = None   # if gaps <= max_gap_interpolate -> linear interpolation
+    winsor_k: float|None = None            # spike threshold: median +- winsor_k * MAD
+    remove_dead_pages: bool = False
 
     lookback: int = 500
     horizon: int = 62
