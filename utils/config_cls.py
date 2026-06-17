@@ -18,10 +18,10 @@ class Config:
     checkpoints_dir: Path = Path("checkpoints").resolve()
 
     # data
-    max_gap_interpolate: int|None = None   # if gaps <= max_gap_interpolate -> linear interpolation
-    winsor_k: float|None = None            # spike threshold: median +- winsor_k * MAD
-    remove_dead_pages: bool = False
-    max_zero_ratio: float = 0.3
+    max_gap_interpolate: int|None = 7   # if gaps <= max_gap_interpolate -> linear interpolation
+    winsor_k: float|None = None         # spike threshold: median +- winsor_k * MAD
+    dead_check_window: int = 365        # remove pages where's no traffic in last `check_window` days
+    max_zero_ratio: float = 0.3         # exclude pages where the fraction of zeros in the series (in dataset sampling) > threshold.
 
     lookback: int = 365
     horizon: int = 62

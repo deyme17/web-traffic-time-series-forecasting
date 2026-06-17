@@ -264,8 +264,7 @@ def main() -> None:
     pages, raw = read_csv(csv_path)
 
     # dead pages
-    if config.remove_dead_pages:
-        raw, pages, _ = drop_dead_pages(raw, pages)
+    raw, pages, _ = drop_dead_pages(raw, pages, config.dead_check_window)
 
     # anomalies
     if config.winsor_k is not None:
