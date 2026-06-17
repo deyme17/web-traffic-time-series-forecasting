@@ -3,9 +3,9 @@ import re
 
 # === data processing constants ===
 
-LAG_DAYS = [7, 31, 91, 180, 365]
+LAG_DAYS = [90, 180, 270, 365]
 
-ACCESS = ["spider", "desktop", "mobile-web", "all-access"]
+ACCESS = ["desktop", "mobile-web", "all-access"]
 AGENTS = ["spider", "all-agents"]
 LANGS = ["de", "en", "es", "fr", "ja", "ru", "zh", "other"]
 SITES = ["wikipedia.org", "commons.wikimedia.org", "www.mediawiki.org"]
