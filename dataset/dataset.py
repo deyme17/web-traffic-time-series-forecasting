@@ -27,9 +27,9 @@ class WTTSF_Dataset(Dataset):
             lookback: encoder window length in days (default 500)
             horizon: decoder / prediction window (default 62)
             split: splitting strategy 'train' | 'val' | 'predict'
-                - train: random start in [0, free_space)
-                - val: fixed start = data_days - lookback - back_offset
-                - predict: same as val but y_hits are future (NaN pad)
+                - train: random start in [0, n_days - lookback - horizon - back_offset)
+                - val: fixed start = n_days - lookback - horizon - back_offset
+                - predict: fixed start = n_days - lookback
             back_offset: days to leave at the end of training window for validation
             transforms: optional callable applied to the output dict.
             seed: random seed for reproducibility.
@@ -79,11 +79,16 @@ class WTTSF_Dataset(Dataset):
 
         self._rng = np.random.default_rng(seed)
 
-        if split in ("valid", "predict"):
+        if split == "valid":
             self._fixed_start = self.n_days - self.lookback - self.horizon - back_offset
             assert self._fixed_start >= 0, (
                 f"lookback ({lookback}) + horizon ({horizon}) + back_offset ({back_offset}) "
                 f"> n_days ({self.n_days})"
+            )
+        elif split == "predict":
+            self._fixed_start = self.n_days - self.lookback
+            assert self._fixed_start >= 0, (
+                f"lookback ({lookback}) > n_days ({self.n_days})"
             )
 
     @property
@@ -111,17 +116,20 @@ class WTTSF_Dataset(Dataset):
         # hits [n_days]
         full_hits = np.array(self._hits[idx], dtype=np.float32)
 
-        raw_window = full_hits[start : end]
-        x_raw = raw_window[:self.lookback]
-        y_raw = raw_window[self.lookback:]
+        x_raw = full_hits[start : start + self.lookback]
 
         # per-series normalization
         mean = float(x_raw.mean())
         std = float(x_raw.std())
         if std < 1e-6: std = 1.
 
-        x_hits = (x_raw - mean) / std  # [lookback]
-        y_hits = (y_raw - mean) / std  # [horizon]
+        x_hits = (x_raw - mean) / std       # [lookback]
+
+        if self.split == "predict":
+            y_hits = np.zeros(self.horizon, dtype=np.float32)
+        else:
+            y_raw = full_hits[start + self.lookback : end]
+            y_hits = (y_raw - mean) / std   # [horizon]
 
         # lags [n_window, N_LAGS]
         lags_ix = self._lagged_ix[start:end]
@@ -163,14 +171,16 @@ class WTTSF_Dataset(Dataset):
         ], axis=1).astype(np.float32)   # [horizon, DEC_DIM]
 
         # target mask [horizon]
-        nan_end = min(end, self._nan_mask.shape[1])
-        raw_mask = ~self._nan_mask[idx, start + self.lookback : nan_end]
-        # pad with False if the window extends past nan_mask
-        if len(raw_mask) < self.horizon:
-            pad = np.zeros(self.horizon - len(raw_mask), dtype=bool)
-            target_mask = np.concatenate([raw_mask, pad])
+        if self.split == "predict":
+            target_mask = np.zeros(self.horizon, dtype=bool)
         else:
-            target_mask = raw_mask
+            nan_end = min(end, self._nan_mask.shape[1])
+            raw_mask = ~self._nan_mask[idx, start + self.lookback : nan_end]
+            if len(raw_mask) < self.horizon:
+                pad = np.zeros(self.horizon - len(raw_mask), dtype=bool)
+                target_mask = np.concatenate([raw_mask, pad])
+            else:
+                target_mask = raw_mask
 
         sample = {
             "enc_input": torch.from_numpy(enc_input),
