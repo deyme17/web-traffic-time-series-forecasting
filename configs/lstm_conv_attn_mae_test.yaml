@@ -9,17 +9,17 @@ test_batch: 256
 n_workers: 4
 
 # training
-seed: 123
-epochs: 20
-warmup_epochs: 18
+seed: 23
+epochs: 15
+warmup_epochs: 8
 max_norm: 2
 patience: 10
 ema_decay: 0.99
 
-tsp_h: 0.000001
-sep_h: 0.000001
-tsp_c: 0.00000001
-sep_c: 0.00000001
+tsp_h: 0.000005
+sep_h: 0.000005
+tsp_c: 0.00000005
+sep_c: 0.00000005
 
 # registries
 model: 
@@ -38,7 +38,7 @@ model:
         dropout_c: 0.005
         dropout_out: 0.3
         readout_dropout: 0.3
-        fingerprint_dropout: 0.35
+        fingerprint_dropout: 0.4
 
 
 loss: 
@@ -58,5 +58,5 @@ optimizer:
 scheduler: 
     name: "CosineAnnealingLR"
     parameters:
-        T_max: 20
+        T_max: 15
         eta_min: 0.0001

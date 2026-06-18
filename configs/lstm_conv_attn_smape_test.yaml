@@ -11,7 +11,7 @@ n_workers: 4
 # training
 seed: 1232
 epochs: 20
-warmup_epochs: 18
+warmup_epochs: 10
 max_norm: 2
 patience: null
 ema_decay: 0.99
@@ -38,7 +38,7 @@ model:
         dropout_c: 0.005
         dropout_out: 0.3
         readout_dropout: 0.3
-        fingerprint_dropout: 0.5
+        fingerprint_dropout: 0.4
 
 
 loss: 
