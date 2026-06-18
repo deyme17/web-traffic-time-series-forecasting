@@ -1,5 +1,5 @@
 # interval
-lookback: 500
+lookback: 365
 horizon: 62
 
 # dataloader
@@ -10,11 +10,11 @@ n_workers: 4
 
 # training
 seed: 123
-epochs: 30
+epochs: 20
 warmup_epochs: 18
 max_norm: 2
 patience: 10
-ema_decay: 0.999
+ema_decay: 0.99
 
 tsp_h: 0.000001
 sep_h: 0.000001
@@ -58,5 +58,5 @@ optimizer:
 scheduler: 
     name: "CosineAnnealingLR"
     parameters:
-        T_max: 30
+        T_max: 20
         eta_min: 0.0001
