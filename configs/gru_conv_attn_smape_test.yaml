@@ -33,7 +33,6 @@ model:
         dropout_dec: 0.0
         dropout_ctx: 0.5
         dropout_h: 0.005
-        dropout_c: 0.005
         dropout_out: 0.3
         readout_dropout: 0.3
         fingerprint_dropout: 0.35

@@ -9,19 +9,21 @@ test_batch: 256
 n_workers: 4
 
 # training
-seed: 321
+seed: 1232
 epochs: 20
-warmup_epochs: 7
+warmup_epochs: 18
 max_norm: 2
 patience: null
 ema_decay: 0.99
 
-tsp_h: 0.000001
-sep_h: 0.000001
+tsp_h: 0.000005
+sep_h: 0.000005
+tsp_c: 0.00000005
+sep_c: 0.00000005
 
 # registries
 model: 
-    name: "GRU_ConvAttn"
+    name: "LSTM_ConvAttn"
     parameters:
         enc_h_size: 256
         dec_h_size: 256
@@ -33,13 +35,14 @@ model:
         dropout_dec: 0.0
         dropout_ctx: 0.5
         dropout_h: 0.005
+        dropout_c: 0.005
         dropout_out: 0.3
         readout_dropout: 0.3
-        fingerprint_dropout: 0.35
+        fingerprint_dropout: 0.5
 
 
 loss: 
-    name: "MAE"
+    name: "SMAPE"
     parameters: {}
 
 
