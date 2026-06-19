@@ -1,0 +1,59 @@
+# interval
+lookback: 365
+horizon: 62
+
+# dataloader
+train_batch: 128
+valid_batch: 256
+test_batch: 256
+n_workers: 4
+
+# training
+seed: 67
+epochs: 10
+warmup_epochs: 0
+max_norm: 5
+patience: null
+ema_decay: 0.999
+
+tsp_h: 0.000003
+sep_h: 0.000003
+
+# registries
+model: 
+    name: "GRU_ConvAttn"
+    parameters:
+        enc_h_size: 256
+        dec_h_size: 256
+        n_layers: 1
+        readout_size: 64
+        fingerprint_size: 16
+        attn_n_heads: 2
+        dropout_enc: 0.0
+        dropout_dec: 0.0
+        dropout_ctx: 0.52
+        dropout_h: 0.015
+        dropout_out: 0.15
+        readout_dropout: 0.48
+        fingerprint_dropout: 0.18
+
+
+loss: 
+    name: "SMAPE"
+    parameters: {}
+
+
+optimizer: 
+    name: "AdamW"
+    parameters:
+        lr:  0.0003
+        betas: [0.9, 0.999]
+        weight_decay: 0.001
+        amsgrad: False
+
+
+scheduler: 
+    name: "CosineAnnealingLR"
+    parameters:
+        T_max: 10
+        eta_min: 0.0001
