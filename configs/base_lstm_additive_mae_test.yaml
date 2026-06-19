@@ -10,10 +10,10 @@ n_workers: 4
 
 # training
 seed: 177
-epochs: 30
-warmup_epochs: 15
+epochs: 10
+warmup_epochs: 1
 max_norm: 2
-patience: 10
+patience: 5
 
 tsp_h: 0.000001
 sep_h: 0.000001
@@ -45,16 +45,14 @@ loss:
 optimizer: 
     name: "AdamW"
     parameters:
-        lr:  0.0004
+        lr:  0.0005
         betas: [0.9, 0.999]
-        weight_decay: 0.0004
+        weight_decay: 0.0001
         amsgrad: False
 
 
 scheduler: 
-    name: "ReduceLROnPlateau"
+    name: "CosineAnnealingLR"
     parameters:
-        mode: 'min'
-        factor: 0.5
-        patience: 7
-        min_lr: 0.00001
+        T_max: 10
+        eta_min: 0.0001

@@ -10,8 +10,8 @@ n_workers: 3
 
 # training
 seed: 17
-epochs: 20
-warmup_epochs: 10
+epochs: 10
+warmup_epochs: 1
 max_norm: 2
 
 # registries
@@ -39,14 +39,14 @@ loss:
 optimizer: 
     name: "AdamW"
     parameters:
-        lr:  0.001
+        lr:  0.0005
         betas: [0.9, 0.999]
-        weight_decay: 0.00001
+        weight_decay: 0.0001
         amsgrad: False
 
 
 scheduler: 
     name: "CosineAnnealingLR"
     parameters:
-        T_max: 20
-        eta_min: 0.00001
+        T_max: 10
+        eta_min: 0.0001
