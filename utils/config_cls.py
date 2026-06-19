@@ -45,7 +45,7 @@ class Config:
     seed: int = 17
     steps: int = 1000
     warmup_steps: int = 300
-    update_steps: int|None = 100
+    update_steps: int = 100
     max_norm: float|None = None
     patience: int|None = None
     ema_decay: float|None = None
