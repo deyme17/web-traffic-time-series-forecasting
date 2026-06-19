@@ -129,11 +129,12 @@ if __name__ == "__main__":
     out_path = Path(args.out)
 
     # validation
+    if len(config_paths) == 1 and len(checkpoint_paths) > 1:
+        config_paths = config_paths * len(checkpoint_paths)
     if len(config_paths) != len(checkpoint_paths):
         raise ValueError(
-            f"Expected equal number of configs and checkpoints "
-            f"(got {len(config_paths)} configs and "
-            f"{len(checkpoint_paths)} checkpoints)."
+            f"Expected equal number of configs and checkpoints, or a single config for all checkpoints "
+            f"(got {len(args.configs)} configs and {len(checkpoint_paths)} checkpoints)."
         )
     if weights is not None and len(weights) != len(config_paths):
         raise ValueError(
