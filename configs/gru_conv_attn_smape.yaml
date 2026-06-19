@@ -10,8 +10,8 @@ n_workers: 4
 
 # training
 seed: 6769
-steps: 1200
-warmup_steps: 900
+steps: 1300
+warmup_steps: 1000
 update_steps: 100
 max_norm: 5
 ema_decay: 0.999
