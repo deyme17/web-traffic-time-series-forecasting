@@ -9,9 +9,9 @@ test_batch: 256
 n_workers: 4
 
 # training
-seed: 69
-steps: 1000
-warmup_steps: 300
+seed: 6769
+steps: 1200
+warmup_steps: 900
 update_steps: 100
 max_norm: 5
 ema_decay: 0.999
@@ -55,5 +55,5 @@ optimizer:
 scheduler: 
     name: "CosineAnnealingLR"
     parameters:
-        T_max: 1000
+        T_max: 1500
         eta_min: 0.0001
