@@ -1,4 +1,5 @@
 from typing import Optional, Tuple, List
+import itertools
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -26,6 +27,39 @@ from losses import get_loss
 
 
 
+
+def _run_validation(model: nn.Module,
+                    valid_loader: DataLoader,
+                    criterion: nn.Module,
+                    ema: Optional[ExponentialMovingAverage],
+                    device: torch.device) -> float:
+    """Run a full pass over valid_loader, return mean loss."""
+    model.eval()
+    val_loss = 0.
+    with (
+        ema.average_parameters() if ema is not None else nullcontext(),
+        torch.no_grad()
+    ):
+        for X in tqdm(valid_loader, desc="Valid", leave=False):
+            enc_in = X["enc_input"].to(device)
+            dec_in = X["dec_input"].to(device)
+            target = X["target"].to(device)
+            target_mask = X["target_mask"].to(device)
+            mean = X["series_mean"].to(device).unsqueeze(-1)
+            std = X["series_std"].to(device).unsqueeze(-1)
+
+            out = model(enc_in, dec_in)
+
+            out = denormalize_tensor(out, mean, std)
+            target = denormalize_tensor(target, mean, std)
+            loss = criterion(out, target, target_mask)
+
+            val_loss += loss.item()
+
+    return val_loss / len(valid_loader)
+
+
+
 def train_rnn(model: nn.Module, 
               optimizer: optim.Optimizer, 
               criterion: nn.Module, 
@@ -34,7 +68,7 @@ def train_rnn(model: nn.Module,
               valid_loader: Optional[DataLoader], 
               scheduler: Optional[lrs.LRScheduler], 
               ema: Optional[ExponentialMovingAverage],
-              curr_epoch: int = 0, 
+              curr_step: int = 0, 
               experiment_tag: str = "experiment",
               train_losses: Optional[List[float]] = None, 
               val_losses: Optional[List[float]] = None,
@@ -54,119 +88,114 @@ def train_rnn(model: nn.Module,
 
     best_val_loss = float('inf')
     patient_level = 0
+    step_count = curr_step
+    update_steps = config.update_steps or config.steps
+    window_train_loss = 0.
+    window_n = 0
 
-    for epoch in range(curr_epoch, config.epochs):
-        train_loss = val_loss = 0
+    # TRAIN
+    model.train()
+    train_iter = itertools.cycle(train_loader)
+    pbar = tqdm(total=config.steps, initial=step_count, desc="Train")
 
-        # train
-        model.train()
+    while step_count < config.steps:
+        X = next(train_iter)
 
-        for X in tqdm(train_loader, desc="Train", leave=False):
-            enc_in = X["enc_input"].to(device)
-            dec_in = X["dec_input"].to(device)
-            target = X["target"].to(device)
-            target_mask = X["target_mask"].to(device)
-            mean = X["series_mean"].to(device).unsqueeze(-1)
-            std = X["series_std"].to(device).unsqueeze(-1)
+        enc_in = X["enc_input"].to(device)
+        dec_in = X["dec_input"].to(device)
+        target = X["target"].to(device)
+        target_mask = X["target_mask"].to(device)
+        mean = X["series_mean"].to(device).unsqueeze(-1)
+        std = X["series_std"].to(device).unsqueeze(-1)
 
-            optimizer.zero_grad(set_to_none=True)
-            
-            out = model(enc_in, dec_in)
+        optimizer.zero_grad(set_to_none=True)
 
-            out = denormalize_tensor(out, mean, std)
-            target = denormalize_tensor(target, mean, std)
-            loss = criterion(out, target, target_mask)
+        out = model(enc_in, dec_in)
 
-            # regularization
-            if hasattr(model, "h_states") and model.h_states is not None:
-                if config.tsp_h > 0:
-                    loss += config.tsp_h * temporal_smoothness_penalty(model.h_states)
-                if config.sep_h > 0:
-                    loss += config.sep_h * state_energy_penalty(model.h_states)
-            if hasattr(model, "c_states") and model.c_states is not None:
-                if config.tsp_c > 0:
-                    loss += config.tsp_c * temporal_smoothness_penalty(model.c_states)
-                if config.sep_c > 0:
-                    loss += config.sep_c * state_energy_penalty(model.c_states)
+        out = denormalize_tensor(out, mean, std)
+        target = denormalize_tensor(target, mean, std)
+        loss = criterion(out, target, target_mask)
 
-            loss.backward()
+        # regularization
+        if hasattr(model, "h_states") and model.h_states is not None:
+            if config.tsp_h > 0:
+                loss += config.tsp_h * temporal_smoothness_penalty(model.h_states)
+            if config.sep_h > 0:
+                loss += config.sep_h * state_energy_penalty(model.h_states)
+        if hasattr(model, "c_states") and model.c_states is not None:
+            if config.tsp_c > 0:
+                loss += config.tsp_c * temporal_smoothness_penalty(model.c_states)
+            if config.sep_c > 0:
+                loss += config.sep_c * state_energy_penalty(model.c_states)
 
-            # grad clipping
-            if config.max_norm is not None:
-                clip_grad_norm_(model.parameters(), config.max_norm)
+        loss.backward()
 
-            optimizer.step()
-            if ema is not None: 
-                ema.update()
-            
-            train_loss += loss.item()
+        # grad clipping
+        if config.max_norm is not None:
+            clip_grad_norm_(model.parameters(), config.max_norm)
 
-        train_loss /= len(train_loader)
-        train_losses.append(train_loss)
+        optimizer.step()
+        if ema is not None:
+            ema.update()
 
-        # eval
-        if valid_loader is not None:
-            model.eval()
-            with (
-                ema.average_parameters() if ema is not None else nullcontext(),
-                torch.no_grad()
-            ):
-                for X in tqdm(valid_loader, desc="Valid", leave=False):
-                    enc_in = X["enc_input"].to(device)
-                    dec_in = X["dec_input"].to(device)
-                    target = X["target"].to(device)
-                    target_mask = X["target_mask"].to(device)
-                    mean = X["series_mean"].to(device).unsqueeze(-1)
-                    std = X["series_std"].to(device).unsqueeze(-1)
+        step_count += 1
+        pbar.update(1)
+        window_train_loss += loss.item()
+        window_n += 1
 
-                    out = model(enc_in, dec_in)
+        # update
+        is_update_step = (step_count % update_steps == 0)
+        is_last_step = (step_count >= config.steps)
 
-                    out = denormalize_tensor(out, mean, std)
-                    target = denormalize_tensor(target, mean, std)
-                    loss = criterion(out, target, target_mask)
+        if is_update_step or is_last_step:
+            train_loss = window_train_loss / max(window_n, 1)
+            train_losses.append(train_loss)
+            window_train_loss, window_n = 0., 0
 
-                    val_loss += loss.item()
-
-            val_loss /= len(valid_loader)
-            val_losses.append(val_loss)
-        else:
-            val_loss = train_loss
-
-        # schedule lr
-        if scheduler is not None:
-            if isinstance(scheduler, lrs.ReduceLROnPlateau):
-                scheduler.step(val_loss)
+            # EVAL
+            if valid_loader is not None:
+                val_loss = _run_validation(model, valid_loader, criterion, ema, device)
+                val_losses.append(val_loss)
+                model.train()
             else:
-                scheduler.step()
+                val_loss = train_loss
 
-        # log
-        lr = scheduler.get_last_lr()[0] if scheduler is not None else optimizer.param_groups[0]["lr"]
-        val_str = "NaN" if valid_loader is None else f"{val_loss:.3f}"
-        print(f"[Epoch: {epoch + 1}] Train Loss: {train_loss:.3f} | Val Loss: {val_str} | lr: {lr}")
-        
-        # checkpoint
-        if val_loss < best_val_loss or valid_loader is None:
-            if epoch >= config.warmup_epochs:
-                with ema.average_parameters() if ema is not None else nullcontext():
-                    save_checkpoint(
-                        model=model, 
-                        optim=optimizer,
-                        scheduler=scheduler,
-                        ema=ema,
-                        train_loss=train_losses, 
-                        val_loss=val_losses, 
-                        epoch=epoch,
-                        save_path=config.checkpoints_dir / f"{experiment_tag}_e{epoch + 1}_checkpoint.pt"
-                    )
-            best_val_loss = val_loss
-            patient_level = 0
-        else:
-            patient_level += 1
+            # schedule lr
+            if scheduler is not None:
+                if isinstance(scheduler, lrs.ReduceLROnPlateau):
+                    scheduler.step(val_loss)
+                else:
+                    scheduler.step()
 
-        # early stopping
-        if config.patience is not None and patient_level >= config.patience:
-            break
+            # log
+            lr = scheduler.get_last_lr()[0] if scheduler is not None else optimizer.param_groups[0]["lr"]
+            val_str = "NaN" if valid_loader is None else f"{val_loss:.3f}"
+            print(f"[Step: {step_count}/{config.steps}] Train Loss: {train_loss:.3f} | Val Loss: {val_str} | lr: {lr}")
 
+            # checkpoint
+            if val_loss < best_val_loss or valid_loader is None:
+                if step_count >= config.warmup_steps:
+                    with ema.average_parameters() if ema is not None else nullcontext():
+                        save_checkpoint(
+                            model=model, 
+                            optim=optimizer,
+                            scheduler=scheduler,
+                            ema=ema,
+                            train_loss=train_losses, 
+                            val_loss=val_losses, 
+                            step=step_count,
+                            save_path=config.checkpoints_dir / f"{experiment_tag}_s{step_count}_checkpoint.pt"
+                        )
+                best_val_loss = val_loss
+                patient_level = 0
+            else:
+                patient_level += 1
+
+            # early stopping
+            if config.patience is not None and patient_level >= config.patience:
+                break
+
+    pbar.close()
     return train_losses, val_losses
 
 
@@ -221,7 +250,7 @@ if __name__ == "__main__":
     print(f"ExponentialMovingAverage is used: {ema is not None}")
 
     # load checkpoint
-    curr_epoch = 0
+    curr_step = 0
     train_losses = []
     val_losses = []
     if args.checkpoint is not None:
@@ -236,10 +265,10 @@ if __name__ == "__main__":
         if ema is not None and state_dict.get("ema") is not None:
             ema.load_state_dict(state_dict["ema"])
 
-        curr_epoch = state_dict["epoch"] + 1
+        curr_step = state_dict["step"]
         train_losses = state_dict["train_loss"]
         val_losses = state_dict["val_loss"]
-        print(f"Resumed '{checkpoint_path}' at epoch {curr_epoch}.")
+        print(f"Resumed '{checkpoint_path}' at step {curr_step}.")
 
     # train
     train_losses, val_losses = train_rnn(
@@ -251,7 +280,7 @@ if __name__ == "__main__":
         valid_loader=valid_loader, 
         scheduler=scheduler, 
         ema=ema,
-        curr_epoch=curr_epoch, 
+        curr_step=curr_step, 
         experiment_tag=args.tag,
         train_losses=train_losses, 
         val_losses=val_losses,
