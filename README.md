@@ -1,6 +1,16 @@
-# Web Traffic Time Series Forecasting
+# Web Traffic Time-Series Forecasting
 
-My work for the [Kaggle Web Traffic Time Series Forecasting](https://www.kaggle.com/competitions/web-traffic-time-series-forecasting/overview) competition. The task: predict daily Wikipedia page views for ~145,000 articles 62 days into the future.
+A PyTorch solution for the [Kaggle Web Traffic Time-Series Forecasting](https://www.kaggle.com/competitions/web-traffic-time-series-forecasting) competition.
+
+**Final submission:** ensemble of 16 GRU+ConvAttention models — **SMAPE: 38.50046**
+
+---
+
+## Competition Overview
+
+The task is to forecast daily page views for ~145,000 Wikipedia articles. Each time series spans from July 1, 2015 to December 31, 2016 (training), with predictions required for 62 future days. The evaluation metric is **SMAPE** (Symmetric Mean Absolute Percentage Error), defined as 0 when both predicted and actual values are 0.
+
+Each page name encodes metadata in the format `<article>_<lang>.wikipedia.org_<access>_<agent>`, enabling extraction of language, access type, and agent type as categorical features.
 
 ---
 
@@ -18,6 +28,7 @@ WTTSF-competition/
 ├── models/
 │   ├── attention/            # Additive, Dot, MultiHead, ConvAttention
 │   ├── lstm_baseline.py      # Seq2seq LSTM with optional attention
+│   ├── gru_conv_attn.py      # GRU + ConvAttention (final model)
 │   └── lstm_conv_attn.py     # LSTM + ConvAttention
 ├── optimizers/
 ├── schedulers/
@@ -27,187 +38,330 @@ WTTSF-competition/
 │   └── helpers.py
 ├── prepare_data.py           # Full preprocessing pipeline
 ├── train.py                  # Training loop
-├── make_prediction.py
+├── make_prediction.py        # Inference & submission builder
 └── plots/                    # EDA images
 ```
 
 ---
 
-## Data & EDA
+## Exploratory Data Analysis
 
-The dataset contains daily page view counts for ~145k Wikipedia articles from **2015-07-01** to **2016-12-31**. Each page name encodes language, access type (desktop / mobile-web / all-access), and agent (spider / all-agents).
-
-**Key findings from EDA:**
-
-**Distribution.** Raw view counts are extremely right-skewed (log scale histogram goes from 10⁸ to 10⁰). After `log1p` transform the distribution becomes approximately normal — justifying the log-space modeling approach.
-
-![Log1p Views Distribution](plots/log1p_views_dist.png)
-
-**Global traffic trend.** Mean traffic peaks mid-dataset, drops sharply at the end — the model needs to handle non-stationarity.
+### Global Traffic
 
 ![Global Mean Traffic](plots/global_mean_traffic.png)
 
-**By access type.** Desktop traffic dominates; mobile and all-access track closely.
+Mean traffic rises through mid-2016, spikes sharply (likely a major event or data anomaly), then falls toward the end of the series. There is a clear weekly seasonality visible as high-frequency oscillation.
 
-![Traffic by Access](plots/global_mean_traffic_by_acc.png)
+### Traffic by Access and Agent
 
-**By language.** English pages receive 4–8× more traffic than all other languages combined.
+![By Access](plots/global_mean_traffic_by_acc.png)
+![By Agent](plots/global_mean_traffic_by_agt.png)
 
-![Traffic by Language](plots/global_mean_traffic_by_lang.png)
+Desktop traffic dominates. Spider (bot) traffic is very low on average but has sharp spikes. All-access and desktop track closely, which makes sense as all-access aggregates all types.
 
-**Seasonality (FFT).** The dominant period is ~7 days (weekly cycle), with a secondary signal around 30 days.
+### Traffic by Language
 
-![FFT Spectrum](plots/fft_global_freq.png)
+![By Language](plots/global_mean_traffic_by_lang.png)
 
-**Autocorrelation.** Strong short-term autocorrelation (slow decay over 30 lags), which confirms that AR-style models are appropriate. Year-over-year and quarter-over-quarter correlations are encoded as per-page scalar features.
+English Wikipedia articles receive far more views than any other language — roughly 3–5× the next largest languages. Russian (`ru`) has one large anomalous spike.
+
+### Frequency Analysis
+
+![FFT](plots/fft_global_freq.png)
+
+FFT of the median series confirms strong weekly (7-day) periodicity. Monthly and half-year peaks are also present but weaker. This motivated encoding day-of-week and month-of-year as sine/cosine features.
+
+### Autocorrelation
 
 ![Autocorrelation](plots/autocorrelation.png)
+![Lag distributions](plots/lags.png)
 
-**Page volatility.** Bimodal distribution — a quiet cluster (low-traffic bot/spider pages) and a noisier cluster of real human-visited pages.
+The global ACF decays slowly but stays strongly positive out to lag 30, confirming persistent short-term autocorrelation. Per-page lag distributions (7, 30, 180, 365 days) are tight around zero for longer lags — most pages have weak long-range seasonal autocorrelation, but the subset with strong yearly patterns justifies including year/quarter autocorrelation as page-level features.
 
-![Page Volatility](plots/page_volatility.png)
+### Views Distribution
+
+![Raw distribution](plots/views_dist.png)
+![Log1p distribution](plots/log1p_views_dist.png)
+
+Raw views follow a heavy-tailed distribution (log scale). After `log1p` transform the distribution is approximately bell-shaped, validating the use of log-space for modeling.
+
+### Page Volatility
+
+![Page volatility](plots/page_volatility.png)
+
+A bimodal distribution: one cluster of low-volatility pages (stable content) and one of high-volatility pages (news, events). The model must handle both regimes.
 
 ---
 
-## Preprocessing (`prepare_data.py`)
+## Data Preprocessing
 
-1. **Dead page removal** — drops pages with no traffic ever, or no traffic in the last 180 days.
-2. **Winsorization** — per-series spike capping: values above `median + k * MAD` are clipped (`k=4` by default).
-3. **Gap interpolation** — linear interpolation for NaN runs ≤ 7 days; longer gaps filled with 0.
-4. **`log1p` transform** — stabilises variance and normalises the distribution.
-5. **Lag indexes** — precomputed source-day indexes for lags `[7, 31, 180, 365]`.
-6. **Temporal features** — sin/cos encodings of day-of-week and month (4 features total).
-7. **Page metadata** — year & quarter autocorrelations, mean/std/CV, one-hot categoricals (lang, access, agent, site) — all normalised to zero mean, unit variance.
+Run once before training:
 
-Outputs saved to `data/processed/`: `hits.npy`, `nan_mask.npy`, `lagged_ix.npy`, `lag_valid.npy`, `temporal.npy`, `page_meta.npz`, `meta.json`.
+```bash
+python prepare_data.py --config configs/your_config.yaml
+```
+
+Outputs are saved to `data/processed/`. Key config parameters (defaults shown):
+
+| Parameter | Default | Description |
+|---|---|---|
+| `lookback` | 365 | Encoder window length (days) |
+| `horizon` | 62 | Prediction window (days) |
+| `add_days` | 63 | Extra days appended for lag index coverage |
+| `first_date` | `2015-07-01` | Date of column index 0 in the CSV |
+| `dead_check_window` | 365 | Drop pages with no traffic in last N days |
+| `max_gap_interpolate` | 7 | Linearly interpolate NaN gaps ≤ N days |
+| `winsor_k` | `null` | Spike cap: median ± `winsor_k` × MAD (disabled by default) |
+| `max_zero_ratio` | 0.3 | Exclude pages where fraction of zeros > threshold (dataset-level) |
+
+### Preprocessing Steps
+
+1. **Drop dead pages** — remove pages with all-zero/NaN traffic or no activity in the last `dead_check_window` days.
+2. **Winsorization** (optional) — per-series spike capping using median ± k·MAD.
+3. **Gap interpolation** — linear interpolation for short NaN runs (≤ `max_gap_interpolate` days); longer gaps are zero-filled.
+4. **Log1p transform** — applied globally before saving.
+5. **Lag indices** — precomputed source-day indices for lags [90, 180, 270, 365] days.
+6. **Temporal features** — sin/cos encodings of day-of-week and month-of-year for every day in `n_days_full`.
+7. **Page-level features** — one-hot encodings of language, access type, agent, site (all z-score normalized); plus page mean, std, coefficient of variation, and smoothed year/quarter autocorrelation.
 
 ---
 
 ## Features
 
-Each timestep in the encoder carries:
+Each encoder timestep receives `ENC_DIM` features; the decoder receives `DEC_DIM = ENC_DIM - 1` (no raw hits in decoder input):
 
-| Group | Features | Dim |
+| Group | Size | Description |
 |---|---|---|
-| Hits (log1p, z-scored) | current page views | 1 |
-| Lagged hits | t−7, t−31, t−180, t−365 | 4 |
-| Lag validity mask | whether lag is in range | 4 |
-| Temporal | sin/cos DOW + sin/cos month | 4 |
-| Page scalars | year AC, quarter AC, mean, std, CV | 5 |
-| Page categoricals | lang (8) + access (4) + agent (2) + site (3) | 17 |
-| **Total ENC_DIM** | | **35** |
-
-The decoder receives the same features minus current hits (DEC_DIM = 34).
-
-All page-level features are tiled across the time axis. Per-series z-score normalisation is applied at sample time inside the Dataset.
+| Hits | 1 | Log1p page views, z-score normalized per series |
+| Lag values | 4 | Lagged hits at 90/180/270/365 days |
+| Lag validity mask | 4 | Binary mask (1 = lag is in range) |
+| Temporal | 4 | sin/cos of day-of-week and month-of-year |
+| Page autocorr | 2 | Year and quarter autocorrelation |
+| Page stats | 3 | Per-page mean, std, coefficient of variation |
+| Page categories | 17 | One-hot: lang (8), access (3), agent (2), site (4) — all z-normalized |
 
 ---
 
-## Architecture
+## Model Architectures
+
+All models follow a **seq2seq** design: an RNN encoder reads the lookback window, and a step-by-step RNN decoder generates `horizon` predictions autoregressively.
 
 ### Baseline LSTM (`lstm_baseline.py`)
 
-Standard seq2seq with optional attention:
+Standard seq2seq LSTM with optional attention on encoder states. Supports `none`, `additive` (Bahdanau), `dot` (scaled dot-product), and `multihead` attention.
 
 ```
-Encoder: LSTM (enc_h_size, n_layers)
-    ↓ last hidden state + mean pooling → context
-Decoder: stacked LSTMCells, autoregressive (prev prediction fed back)
-    ↑ optional attention (additive | dot | multihead) over encoder states
-Output: Linear → scalar prediction per step
+Encoder (LSTM, n_layers) → [enc_states, h_n, c_n]
+Attention (query=h_dec, keys=enc_states) → context
+Decoder (LSTMCell × n_layers): [prev_pred | dec_in | context] → pred_t
 ```
 
-Available attention types (all in `models/attention/attentions.py`):
+### LSTM + ConvAttention (`lstm_conv_attn.py`)
 
-- **Additive** (Bahdanau-style) — `W_q(query) + W_k(keys)` → tanh → scalar score
-- **Dot** (scaled dot-product) — projected Q·K / √d
-- **MultiHead** — wraps `nn.MultiheadAttention`, projects back to key size
+Replaces standard attention with `ConvAttention` (see below).
 
-### ConvAttn LSTM (`lstm_conv_attn.py`)
+### GRU + ConvAttention (`gru_conv_attn.py`) — Final Model
 
-Replaces classical attention with `ConvAttention` (inspired by Arturus):
+Same structure but uses GRU instead of LSTM. GRU is easier to regularize (no cell state), trains faster, and proved more stable.
+
+### ConvAttention (`conv_attention.py`)
+
+Inspired by the 1st-place solution. Instead of query-key attention over encoder states at each decoder step, a `ConvFingerprint` CNN produces a compact signature of the input series, which is used to compute attention weights over an attention window via a learned linear projection. These weights are applied as a depthwise convolution over encoder readouts, producing a fixed attention context for all `horizon` steps at once.
 
 ```
-ConvFingerprint (CNN): enc_input[:, :, :2] → fingerprint vector
-    3× [Conv1d → ReLU → MaxPool]  +  2× Linear
-
-ConvAttention:
-    fingerprint → focus scores [B, attn_window, n_heads]   (softmax)
-    enc_states  → readout [B, readout_size, lookback]
-    depthwise conv1d per head: sliding readout × focus weights → [B, readout_size, horizon]
-    concat heads → [B, horizon, readout_size * n_heads]
+enc_input[:, :, :FINGERPRINT_SIGNAL] → ConvFingerprint (CNN) → fingerprint [B, fingerprint_size]
+fingerprint → Linear → scores [B, attn_window, n_heads] → normalize
+enc_states → Linear → readout [B, lookback, readout_size]
+depthwise conv(readout, scores) per head → [B, horizon, readout_size]
+concat heads → [B, horizon, readout_size * n_heads]
 ```
 
-The attention is computed **once** before the decoder loop (not re-queried each step), which makes it much faster on long sequences. The encoder final states are projected into decoder initial states via learned linear layers.
+This is more efficient than per-step attention (one forward pass produces the full horizon context) and captures global series shape rather than local alignment.
 
 ---
 
 ## Training
 
-**Loop** (`train.py`): standard PyTorch with tqdm, gradient clipping, EMA weights, early stopping, and checkpoint saving on validation improvement.
+```bash
+python train.py --config configs/gru_conv_attn_smape.yaml --tag gru_conv_attn_smape_1
 
-**Data split strategy:**
+# With validation split
+python train.py --config configs/gru_conv_attn_smape.yaml --use-valid --tag experiment
+```
 
-The pipeline supports two modes depending on whether validation is used (controlled via the `--use-valid` flag):
+### Training Loop Design
 
-* **Final Training Mode (No Validation):** Used for production runs to train the final model with maximum data before making competition predictions.
-  * **`train`** — Random window start that can use the entire available time range up to the last available day (`back_offset=0`). This maximizes data augmentation via random offsets.
-  * **`valid`** — Disabled (`None`).
-* **Experimentation Mode (With Validation):** Used exclusively for hyperparameter tuning and model architecture evaluation.
-  * **`train`** — Random window start, but constrained to leave a `back_offset` (equal to the forecasting `horizon`) at the very end of the time series to prevent data leakage into the validation set.
-  * **`valid`** — A single fixed window at the very end of the dataset: `n_days - lookback - horizon - back_offset`.
+**Step-based (not epoch-based).** The dataset is large and epoch-level checkpointing caused slow feedback loops. Training runs for `steps` gradient updates, with evaluation/checkpointing every `update_steps` steps. This also gave fine-grained control over early stopping and EMA warmup.
 
-**EMA**: `torch_ema.ExponentialMovingAverage` with `decay=0.999` — averaged weights used at inference and checkpoint saving.
+**Denormalized loss.** The model predicts in normalized (z-score) space but loss is computed after denormalizing both predictions and targets back to log1p space. This made SMAPE significantly more stable and better calibrated compared to computing it in normalized space.
+
+**Exponential Moving Average (EMA).** Applied to model weights with `ema_decay=0.999`. EMA weights are used for both validation and inference, substantially reducing variance across runs.
+
+**Checkpointing.** Best checkpoint (lowest validation loss) is saved. Warmup phase (`warmup_steps`) suppresses saving until the model has converged past its initial instability.
 
 ---
 
-## Experiments
+## Regularization
 
-### Loss functions
+RNNs on time series overfit aggressively. Multiple regularization mechanisms were combined:
 
-| Loss | Notes |
+**Dropout (all applied independently):**
+
+| Parameter | Location |
 |---|---|
-| **Smoothed SMAPE** | Competition metric; most stable gradients. `0.5 + ε=0.1` avoids division-by-zero. |
-| **MAE** | Simple, slightly better final results than SMAPE in practice. |
-| **Huber** | Smaller `delta` → closer to MAE → better results. |
+| `dropout_enc` | Between encoder LSTM layers |
+| `dropout_dec` | Between decoder RNN layers |
+| `dropout_ctx` | On encoder hidden state passed to decoder init |
+| `dropout_h` | On decoder hidden state at each step |
+| `dropout_c` | On decoder cell state (LSTM only) |
+| `dropout_out` | Before output projection |
+| `readout_dropout` | Before readout projection in ConvAttention |
+| `fingerprint_dropout` | Before FC layers in ConvFingerprint |
 
-### Model comparison
+**State regularization penalties** (added to loss):
 
-| Model | Notes |
+- `temporal_smoothness_penalty` (TSP) — penalizes `||h_t - h_{t-1}||²`, encouraging smooth hidden state trajectories.
+- `state_energy_penalty` (SEP) — penalizes `||h||²`, discouraging large activations.
+
+Both are applied to decoder hidden (and cell) states with configurable weights `tsp_h`, `sep_h`, `tsp_c`, `sep_c`.
+
+The final config uses very strong regularization: `dropout_ctx=0.52`, `readout_dropout=0.48`, `fingerprint_dropout=0.18`, `tsp_h=sep_h=3e-6`.
+
+---
+
+## Experiment History & Key Decisions
+
+### Loss Function
+
+Initial experiments compared MAE, Huber, and smoothed SMAPE across identical baseline LSTM configs:
+- **MAE** — solid baseline.
+- **Huber** — similar to MAE at small `delta`; degraded as `delta` increased.
+- **Smoothed SMAPE** — occasionally worse than MAE early on, but more stable and better on the public leaderboard. After switching to denormalized loss computation it consistently outperformed the others and became the final choice.
+
+### Attention Mechanisms
+
+Tested on the baseline LSTM: `multihead ≈ additive > dot`. Additive attention was chosen as the default for its efficiency. ConvAttention then outperformed or matched additive attention while being faster (no per-step computation).
+
+### 2-Layer RNN
+
+A 2-layer stacked RNN was tested and failed — significantly worse validation loss and unstable training. Stayed with `n_layers=1` throughout.
+
+### LSTM → GRU
+
+After ConvAttention was stable, switched from LSTM to GRU. GRU has no cell state, halving the number of state-related dropout/regularization parameters, and proved easier to tune. Validation quality was equivalent or better.
+
+### Validation Strategy
+
+An early `--use-valid` split was used to diagnose overfitting and compare loss functions. Later experiments were evaluated directly via Kaggle submissions to avoid overfitting the validation split. The final config does not use a held-out validation set — all data goes to training.
+
+### Ensemble
+
+Final submission: **16 models** — 4 random seeds × 4 checkpoint steps (1100/1200/1300/1400). Predictions are averaged with equal weights. This reduced variance substantially compared to any single model.
+
+---
+
+## Final Configuration
+
+`configs/gru_conv_attn_smape.yaml`:
+
+```yaml
+lookback: 365
+horizon: 62
+
+train_batch: 128
+n_workers: 4
+
+seed: 6769
+steps: 1400
+warmup_steps: 1100
+update_steps: 100
+max_norm: 5
+ema_decay: 0.999
+
+tsp_h: 0.000003
+sep_h: 0.000003
+
+model:
+  name: "GRU_ConvAttn"
+  parameters:
+    enc_h_size: 256
+    dec_h_size: 256
+    n_layers: 1
+    readout_size: 64
+    fingerprint_size: 16
+    attn_n_heads: 2
+    dropout_ctx: 0.52
+    dropout_h: 0.015
+    dropout_out: 0.15
+    readout_dropout: 0.48
+    fingerprint_dropout: 0.18
+
+loss:
+  name: "SMAPE"
+
+optimizer:
+  name: "AdamW"
+  parameters:
+    lr: 0.0003
+    betas: [0.9, 0.999]
+    weight_decay: 0.001
+
+scheduler:
+  name: "CosineAnnealingLR"
+  parameters:
+    T_max: 14
+    eta_min: 0.0001
+```
+
+---
+
+## Reproducing the Final Submission
+
+### 1. Preprocess
+
+```bash
+python prepare_data.py --config configs/gru_conv_attn_smape.yaml
+```
+
+### 2. Train (4 seeds)
+
+```bash
+for SEED in 1 2 3 4; do
+  python train.py \
+    --config configs/gru_conv_attn_smape.yaml \
+    --tag gru_conv_attn_smape_${SEED}
+done
+```
+
+Each seed produces checkpoints at steps 1100, 1200, 1300, 1400 (saved when validation loss improves or at the final step).
+
+### 3. Predict & Ensemble
+
+```bash
+python make_prediction.py \
+  --configs configs/gru_conv_attn_smape.yaml \
+  --checkpoints \
+    checkpoints/gru_conv_attn_smape_1_s1100_checkpoint.pt \
+    checkpoints/gru_conv_attn_smape_1_s1200_checkpoint.pt \
+    checkpoints/gru_conv_attn_smape_1_s1300_checkpoint.pt \
+    checkpoints/gru_conv_attn_smape_1_s1400_checkpoint.pt \
+    checkpoints/gru_conv_attn_smape_2_s1100_checkpoint.pt \
+    ... (all 16 checkpoints) \
+  --key data/key_2.csv \
+  --out submissions/submission.csv
+```
+
+---
+
+## Results
+
+| Submission | SMAPE |
 |---|---|
-| Baseline (no attn) | Solid baseline |
-| + Additive attn | Similar to baseline, marginally better |
-| + Dot attn | Slightly worse than additive |
-| + MultiHead attn | More expensive, similar to additive |
-| **ConvAttn** | Slightly better and faster than classical attention |
-
-### Epochs
-
-~20 epochs was optimal across all experiments.
-
----
-
-## Predictions
-
-![True vs Predicted](plots/eval_predictions.png)
-
-The model captures the general level and slow trends well. High-frequency spikes remain difficult to predict — consistent with the noisy autocorrelation structure of the data (lag-7 ACF is broadly distributed, not a sharp peak).
-
----
-
-## Key Takeaways
-
-- **log1p normalisation** is essential; raw counts are too skewed.
-- **Lagged features** (7 / 31 / 180 / 365 days) are the single most impactful feature group — they explicitly give the model access to seasonal information without requiring perfect LSTM long-range memory.
-- **ConvAttention** is a good alternative to standard attention for long sequences: computed once, not per-step.
-- **MAE/smoothed SMAPE loss** both are good for this data.
-- **EMA + multi-checkpoint ensembling** reduces variance significantly on noisy data.
-- Resutls are decent but not competitive — further gains would likely come from better data preprocessing, smarter architectures, larger ensembles, better hyperparameter search, and test-time augmentation.
+| GRU + ConvAttention + SMAPE, ensemble (4 seeds × 4 steps) | **38.50046** |
 
 ---
 
 ## References
 
-- [Arturus — 1st place solution](https://github.com/Arturus/kaggle-web-traffic) — architecture inspiration, especially ConvAttention and lagged features
-- [Competition overview](https://www.kaggle.com/competitions/web-traffic-time-series-forecasting/overview)
-- Bahdanau et al. — *Neural Machine Translation by Jointly Learning to Align and Translate*
+- [1st place solution by Arturus](https://www.kaggle.com/competitions/web-traffic-time-series-forecasting/discussion/43795) — core inspiration for the ConvAttention / fingerprint approach and smoothed SMAPE loss.
+- [Web Traffic Time-Series Forecasting — Kaggle competition](https://www.kaggle.com/competitions/web-traffic-time-series-forecasting)
