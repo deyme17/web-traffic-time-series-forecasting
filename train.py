@@ -1,5 +1,4 @@
 from typing import Optional, Tuple, List
-import itertools
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -95,11 +94,15 @@ def train_rnn(model: nn.Module,
 
     # TRAIN
     model.train()
-    train_iter = itertools.cycle(train_loader)
+    train_iter = iter(train_loader)
     pbar = tqdm(total=config.steps, initial=step_count, desc="Train")
 
     while step_count < config.steps:
-        X = next(train_iter)
+        try:
+            X = next(train_iter)
+        except StopIteration:
+            train_iter = iter(train_loader)
+            X = next(train_iter)
 
         enc_in = X["enc_input"].to(device)
         dec_in = X["dec_input"].to(device)
@@ -170,7 +173,9 @@ def train_rnn(model: nn.Module,
             # log
             lr = scheduler.get_last_lr()[0] if scheduler is not None else optimizer.param_groups[0]["lr"]
             val_str = "NaN" if valid_loader is None else f"{val_loss:.3f}"
-            print(f"[Step: {step_count}/{config.steps}] Train Loss: {train_loss:.3f} | Val Loss: {val_str} | lr: {lr}")
+            pbar.clear()
+            print(f"[Step: {step_count}/{config.steps}] Train Loss: {train_loss:.3f} | Val Loss: {val_str} | lr: {lr:.5f}")
+            pbar.refresh()
 
             # checkpoint
             if val_loss < best_val_loss or valid_loader is None:
