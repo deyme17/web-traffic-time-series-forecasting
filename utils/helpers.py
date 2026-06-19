@@ -63,10 +63,10 @@ def save_checkpoint(model: nn.Module,
                     ema: Optional[ExponentialMovingAverage],
                     train_loss: List[float], 
                     val_loss: Optional[List[float]], 
-                    epoch: int, save_path: Path|str) -> None:
-    """Save checkpoint dict with epoch, model, optimizer, losses."""
+                    step: int, save_path: Path|str) -> None:
+    """Save checkpoint dict with step, model, optimizer, losses."""
     torch.save({
-        "epoch": epoch,
+        "step": step,
         "model": model.state_dict(),
         "optim": optim.state_dict(),
         "ema": ema.state_dict(),

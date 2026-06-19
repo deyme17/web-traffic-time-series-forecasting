@@ -43,8 +43,9 @@ class Config:
 
     # training
     seed: int = 17
-    epochs: int = 50
-    warmup_epochs: int = 0
+    steps: int = 1000
+    warmup_steps: int = 300
+    update_steps: int|None = 100
     max_norm: float|None = None
     patience: int|None = None
     ema_decay: float|None = None
