@@ -55,5 +55,5 @@ optimizer:
 scheduler: 
     name: "CosineAnnealingLR"
     parameters:
-        T_max: 1500
+        T_max: 1200
         eta_min: 0.0001
