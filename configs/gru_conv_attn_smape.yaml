@@ -10,7 +10,7 @@ n_workers: 4
 
 # training
 seed: 6769
-steps: 1300
+steps: 1400
 warmup_steps: 1000
 update_steps: 100
 max_norm: 5
@@ -55,5 +55,5 @@ optimizer:
 scheduler: 
     name: "CosineAnnealingLR"
     parameters:
-        T_max: 12 # steps / update_steps
+        T_max: 14 # steps / update_steps
         eta_min: 0.0001
